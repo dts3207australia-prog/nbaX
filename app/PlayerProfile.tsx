@@ -29,9 +29,14 @@ export default function PlayerProfile({
     fanscout && { label: "FanScout", rank: fanscout.rank, total: fanscout.total, outOf: fanscoutPlayers.length },
   ].filter(Boolean) as { label: string; rank: number; total: number; outOf: number }[];
 
-  const ranks = sources.map((s) => s.rank);
-  const rankRange = ranks.length > 1 ? `#${Math.min(...ranks)}–${Math.max(...ranks)}` : ranks.length ? `#${ranks[0]}` : "—";
-  const spread = ranks.length > 1 ? Math.max(...ranks) - Math.min(...ranks) : 0;
+  // Normalize each source's rank onto a common 200-player scale before
+  // comparing — pool sizes differ (My Rankings: 481, Consensus: 200,
+  // FanScout: 481), so raw rank numbers aren't directly comparable.
+  const scaledRanks = sources.map((s) => (s.rank / s.outOf) * 200);
+  const rankRange = sources.length > 1
+    ? `#${Math.round(Math.min(...scaledRanks))}–${Math.round(Math.max(...scaledRanks))}`
+    : sources.length ? `#${sources[0].rank}` : "—";
+  const spread = scaledRanks.length > 1 ? Math.max(...scaledRanks) - Math.min(...scaledRanks) : 0;
   const highVariance = spread >= 15;
 
   const row = (label: string, mineVal: string | undefined, consVal: string | undefined) => (
@@ -70,7 +75,7 @@ export default function PlayerProfile({
         <div className="p-5 space-y-5">
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-surface-raised border border-border-subtle rounded-xl p-3">
-              <div className="text-xs text-text-muted">Consensus rank</div>
+              <div className="text-xs text-text-muted">Rank range (normalized /200)</div>
               <div className="font-display text-xl font-medium text-text-primary mt-0.5 tabular">{rankRange}</div>
             </div>
             <div className="bg-surface-raised border border-border-subtle rounded-xl p-3">
@@ -97,7 +102,7 @@ export default function PlayerProfile({
 
           {highVariance && (
             <p className="text-sm text-status-warning bg-[color:var(--status-warning-bg)] border border-status-warning/30 rounded-lg px-3 py-2.5">
-              Sources disagree by {spread} spots on this player — one view may
+              Sources disagree by roughly {Math.round(spread)} spots (normalized to a 200-player scale) on this player — one view may
               be pricing in something (role change, injury risk, upside) the
               other isn&apos;t. Worth a second look before you draft off just one number.
             </p>
@@ -139,7 +144,7 @@ export default function PlayerProfile({
                   {row("FG%", mine ? `${(mine.fgPct * 100).toFixed(1)}%` : undefined, consensus?.fgZ.toFixed(2))}
                   {row("FT%", mine ? `${(mine.ftPct * 100).toFixed(1)}%` : undefined, consensus?.ftZ.toFixed(2))}
                   {row("3PM", mine?.tpm.toFixed(1), consensus?.tpmZ.toFixed(2))}
-                  {row("3P%", mine ? `${(mine.tpPct * 100).toFixed(1)}%` : undefined, consensus?.tpPctZ.toFixed(2))}
+                  {row("3P%", mine ? (mine.tpDataAvailable ? `${(mine.tpPct * 100).toFixed(1)}%` : "—") : undefined, consensus?.tpPctZ.toFixed(2))}
                   {row("OREB", mine?.oreb.toFixed(1), consensus?.orebZ.toFixed(2))}
                   {row("DREB", mine?.dreb.toFixed(1), consensus?.drebZ.toFixed(2))}
                   {row("AST", mine?.ast.toFixed(1), consensus?.astZ.toFixed(2))}

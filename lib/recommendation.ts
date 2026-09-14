@@ -94,13 +94,17 @@ export function computeRecommendations({
       100 * (0.60 * normalizedValue + 0.25 * needScore + 0.15 * scarcityScore)
     ));
 
-    // Confidence from cross-source rank variance (using full-pool ranks, not just available)
+    // Confidence from cross-source rank variance, on a percentile basis —
+    // pool sizes differ (481 "mine" vs 200 consensus), so raw rank
+    // differences aren't comparable without normalizing first.
     const consensusFull = allConsensusByKey.get(normalizeName(player.name));
     let confidence: Confidence = "LOW";
-    let variance: number | null = null;
+    let variancePct: number | null = null;
     if (consensusFull) {
-      variance = Math.abs(player.rank - consensusFull.rank);
-      confidence = variance <= 10 ? "HIGH" : variance <= 25 ? "MEDIUM" : "LOW";
+      const myPercentile = (player.rank / allMyPlayers.length) * 100;
+      const consPercentile = (consensusFull.rank / allConsensus.length) * 100;
+      variancePct = Math.abs(myPercentile - consPercentile);
+      confidence = variancePct <= 5 ? "HIGH" : variancePct <= 12 ? "MEDIUM" : "LOW";
     }
 
     const reasons: Recommendation["reasons"] = [];
@@ -116,8 +120,8 @@ export function computeRecommendations({
       const qualifier = z > 1.5 ? "Excellent" : "Strong";
       reasons.push({ icon: "strength", text: `${qualifier} ${CATEGORY_LABEL[cat]}` });
     }
-    if (variance !== null && variance > 25) {
-      reasons.push({ icon: "caution", text: `Sources disagree by ${variance} spots — worth a second look` });
+    if (variancePct !== null && variancePct > 12) {
+      reasons.push({ icon: "caution", text: `Sources disagree substantially on this player — worth a second look` });
     }
     if (!consensusByKey.has(normalizeName(player.name)) && availableConsensus.length > 0) {
       // present in "mine" but not matched in consensus at all

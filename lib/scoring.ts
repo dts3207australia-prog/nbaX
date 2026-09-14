@@ -1,20 +1,15 @@
-import playersRaw from "@/data/players.json";
+import fanscoutRaw from "@/data/fanscout.json";
+import type { FanscoutPlayerRaw } from "./fanscout";
+import { normalizeName } from "./names";
 
-export type Player = {
+export type ScoredPlayer = {
   name: string;
   pos: string;
-  fgm: number; fga: number;
-  ftm: number; fta: number;
-  tpm: number; tpa: number;
+  fgPct: number; fga: number;
+  ftPct: number; fta: number;
+  tpm: number; tpPct: number; tpDataAvailable: boolean;
   oreb: number; dreb: number;
-  ast: number; stl: number; blk: number; tov: number;
-  pts: number;
-};
-
-export type ScoredPlayer = Player & {
-  fgPct: number;
-  ftPct: number;
-  tpPct: number;
+  ast: number; stl: number; blk: number; pts: number;
   ato: number;
   categoryZ: {
     fg: number; ft: number; tpm: number; tpPct: number;
@@ -38,42 +33,47 @@ function zScore(value: number, arr: number[]) {
   return sd === 0 ? 0 : (value - mean(arr)) / sd;
 }
 
-// Categories: FG%, FT%, 3PM, 3P%, OREB, DREB, AST, A/TO, STL, BLK, PTS (11 total)
-export function scorePlayers(): ScoredPlayer[] {
-  const players = playersRaw as Player[];
+// "My Rankings" — our own 11-category z-score engine, run on FanScout's
+// real 2026-27 per-game projections rather than last season's actuals.
+// 3P% is excluded (contributes 0) since the source has no 3-point-attempts
+// data to compute it from; every other category is a genuine volume-aware
+// z-score matching the league's exact rules.
+export function scorePlayers(posLookup: Map<string, string>): ScoredPlayer[] {
+  const raw = fanscoutRaw as FanscoutPlayerRaw[];
 
-  const derived = players.map((p) => ({
-    ...p,
-    fgPct: p.fga > 0 ? p.fgm / p.fga : 0,
-    ftPct: p.fta > 0 ? p.ftm / p.fta : 0,
-    tpPct: p.tpa > 0 ? p.tpm / p.tpa : 0,
-    ato: p.tov > 0 ? p.ast / p.tov : p.ast,
+  const base = raw.map((p) => ({
+    name: p.name,
+    pos: posLookup.get(normalizeName(p.name)) ?? "—",
+    fgPct: p.fgPct, fga: p.fga,
+    ftPct: p.ftPct, fta: p.fta,
+    tpm: p.tpm, tpPct: 0, tpDataAvailable: false,
+    oreb: p.oreb, dreb: p.dreb,
+    ast: p.ast, stl: p.stl, blk: p.blk, pts: p.pts,
+    ato: p.ato,
   }));
 
-  const avgFgPct = mean(derived.map((p) => p.fgPct));
-  const avgFtPct = mean(derived.map((p) => p.ftPct));
-  const avgTpPct = mean(derived.map((p) => p.tpPct));
+  const avgFgPct = mean(base.map((p) => p.fgPct));
+  const avgFtPct = mean(base.map((p) => p.ftPct));
 
-  // volume-weighted percentage impact, same approach as the spreadsheet
-  const fgImpact = derived.map((p) => (p.fgPct - avgFgPct) * p.fga);
-  const ftImpact = derived.map((p) => (p.ftPct - avgFtPct) * p.fta);
-  const tpPctImpact = derived.map((p) => (p.tpPct - avgTpPct) * p.tpa);
+  // volume-weighted percentage impact
+  const fgImpact = base.map((p) => (p.fgPct - avgFgPct) * p.fga);
+  const ftImpact = base.map((p) => (p.ftPct - avgFtPct) * p.fta);
 
-  const tpmArr = derived.map((p) => p.tpm);
-  const orebArr = derived.map((p) => p.oreb);
-  const drebArr = derived.map((p) => p.dreb);
-  const astArr = derived.map((p) => p.ast);
-  const atoArr = derived.map((p) => p.ato);
-  const stlArr = derived.map((p) => p.stl);
-  const blkArr = derived.map((p) => p.blk);
-  const ptsArr = derived.map((p) => p.pts);
+  const tpmArr = base.map((p) => p.tpm);
+  const orebArr = base.map((p) => p.oreb);
+  const drebArr = base.map((p) => p.dreb);
+  const astArr = base.map((p) => p.ast);
+  const atoArr = base.map((p) => p.ato);
+  const stlArr = base.map((p) => p.stl);
+  const blkArr = base.map((p) => p.blk);
+  const ptsArr = base.map((p) => p.pts);
 
-  const scored: Omit<ScoredPlayer, "rank">[] = derived.map((p, i) => {
+  const scored: Omit<ScoredPlayer, "rank">[] = base.map((p, i) => {
     const categoryZ = {
       fg: zScore(fgImpact[i], fgImpact),
       ft: zScore(ftImpact[i], ftImpact),
       tpm: zScore(p.tpm, tpmArr),
-      tpPct: zScore(tpPctImpact[i], tpPctImpact),
+      tpPct: 0, // no 3PA data available from this source
       oreb: zScore(p.oreb, orebArr),
       dreb: zScore(p.dreb, drebArr),
       ast: zScore(p.ast, astArr),

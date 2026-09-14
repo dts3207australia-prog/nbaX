@@ -144,7 +144,7 @@ export default function DraftBoard({
   );
 
   const sourceLabel: Record<Source, string> = {
-    mine: "Your custom rankings — z-scores computed from raw 2025-26 per-game stats.",
+    mine: "Your custom rankings — z-scores computed from FanScout's real 2026-27 per-game projections. 3P% isn't available from this source, so it's excluded (contributes 0).",
     consensus: "Consensus rankings — a second, independently pre-scored source (projected + estimated categories).",
     fanscout: "FanScout projections — real 2026-27 per-game projections with their own value score (10 of 11 categories match your league; only 3P% is missing).",
   };
@@ -255,7 +255,7 @@ export default function DraftBoard({
                         <td className="px-3 py-2 tabular text-text-secondary">{(mp.fgPct * 100).toFixed(1)}%</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{(mp.ftPct * 100).toFixed(1)}%</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{mp.tpm.toFixed(1)}</td>
-                        <td className="px-3 py-2 tabular text-text-secondary">{(mp.tpPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.tpDataAvailable ? `${(mp.tpPct * 100).toFixed(1)}%` : "—"}</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{mp.oreb.toFixed(1)}</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{mp.dreb.toFixed(1)}</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{mp.ast.toFixed(1)}</td>
