@@ -42,6 +42,29 @@ vercel --prod
 \`\`\`
 Follow the prompts; it'll give you a live URL in under a minute.
 
+## Live ESPN sync
+
+The "🔄 Sync with ESPN" button pulls your league's current rosters straight
+from ESPN Fantasy and marks those players as drafted, with the right team
+name, automatically.
+
+**Setup (one-time):**
+1. Log into fantasy.espn.com, open DevTools → Application (Chrome) or
+   Storage (Firefox) → Cookies → `https://fantasy.espn.com`.
+2. Copy the values of the `espn_s2` and `SWID` cookies (SWID includes the
+   curly braces).
+3. In your Vercel project: Settings → Environment Variables, add:
+   - `ESPN_S2` = (the espn_s2 value)
+   - `ESPN_SWID` = (the SWID value, including `{ }`)
+   - `ESPN_LEAGUE_ID` = `85907` (only needed if it ever changes)
+   - `ESPN_SEASON_ID` = `2027` (ESPN's season-end year, e.g. 2026-27 → 2027)
+   - `ESPN_TEAM_ID` = `20` (your team ID, used to detect "My Team")
+4. Redeploy (Vercel → Deployments → ⋯ → Redeploy) so the new env vars take effect.
+
+These cookies are read only server-side, inside `/app/api/espn/route.ts` —
+they're never sent to the browser. If sync starts failing, your ESPN
+session likely expired; repeat steps 1–2 and update the Vercel values.
+
 ## Updating player data
 Player stats live in \`data/players.json\`. Edit or regenerate that file
 (e.g. from a fresh CSV export) and redeploy — the scoring engine in

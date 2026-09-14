@@ -29,6 +29,8 @@ export default function AppShell({
   const [editingTeams, setEditingTeams] = useState(false);
   const [profilePlayer, setProfilePlayer] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const savedState = localStorage.getItem(STORAGE_KEY);
@@ -52,6 +54,60 @@ export default function AppShell({
 
   const myTeamName = teams[0] ?? "My Team";
 
+  const syncWithEspn = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch("/api/espn");
+      const data = await res.json();
+      if (!res.ok) {
+        setSyncMessage(`⚠️ ${data.error ?? "Sync failed."}`);
+        return;
+      }
+      type EspnTeam = { espnTeamId: number; name: string; isMe: boolean; players: string[] };
+      const espnTeams: EspnTeam[] = data.teams ?? [];
+      if (espnTeams.length === 0) {
+        setSyncMessage("⚠️ ESPN returned no teams — check the league ID and cookies.");
+        return;
+      }
+
+      // Reorder so "my" team is first, matching how the app treats teams[0].
+      const ordered = [
+        ...espnTeams.filter((t) => t.isMe),
+        ...espnTeams.filter((t) => !t.isMe),
+      ];
+      setTeams(ordered.map((t) => t.name));
+
+      let matched = 0;
+      let unmatched = 0;
+      setDraftState((prev) => {
+        const next = { ...prev };
+        for (const t of ordered) {
+          for (const playerName of t.players) {
+            const key = normalizeName(playerName);
+            const inPool =
+              myPlayers.some((p) => normalizeName(p.name) === key) ||
+              consensusPlayers.some((p) => normalizeName(p.name) === key);
+            if (!inPool) {
+              unmatched++;
+              continue;
+            }
+            matched++;
+            next[key] = { draftedBy: t.name, note: next[key]?.note ?? "" };
+          }
+        }
+        return next;
+      });
+      setSyncMessage(
+        `✅ Synced ${ordered.length} teams — ${matched} players matched${unmatched ? `, ${unmatched} not found in your player pool` : ""}.`
+      );
+    } catch (err) {
+      setSyncMessage(`⚠️ Sync failed: ${String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const myRosterPlayers = Object.entries(draftState)
     .filter(([, v]) => v.draftedBy === myTeamName)
     .map(([key]) => {
@@ -74,13 +130,28 @@ export default function AppShell({
           <h1 className="text-2xl md:text-3xl font-bold text-slate-100">NBA Draft Manager</h1>
           <p className="text-slate-400 text-sm mt-1">Dunk it Dunk it! — 8-team Rotisserie</p>
         </div>
-        <button
-          onClick={() => setEditingTeams(!editingTeams)}
-          className="text-xs text-slate-400 hover:text-slate-200 underline"
-        >
-          {editingTeams ? "Done editing teams" : "Edit team names"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={syncWithEspn}
+            disabled={syncing}
+            className="text-xs bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 rounded px-3 py-1.5 disabled:opacity-50"
+          >
+            {syncing ? "Syncing..." : "🔄 Sync with ESPN"}
+          </button>
+          <button
+            onClick={() => setEditingTeams(!editingTeams)}
+            className="text-xs text-slate-400 hover:text-slate-200 underline"
+          >
+            {editingTeams ? "Done editing teams" : "Edit team names"}
+          </button>
+        </div>
       </header>
+
+      {syncMessage && (
+        <p className="text-sm mb-4 px-3 py-2 rounded bg-slate-900 border border-slate-700 text-slate-300">
+          {syncMessage}
+        </p>
+      )}
 
       {editingTeams && (
         <div className="mb-4 p-3 bg-slate-900 border border-slate-700 rounded-lg grid grid-cols-2 md:grid-cols-4 gap-2">
