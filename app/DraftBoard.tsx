@@ -3,10 +3,13 @@
 import { useMemo, useState } from "react";
 import type { ScoredPlayer } from "@/lib/scoring";
 import type { ConsensusPlayer } from "@/lib/consensus";
+import type { FanscoutPlayer } from "@/lib/fanscout";
 import { normalizeName } from "@/lib/names";
 import type { DraftState } from "./AppShell";
 
-type Source = "mine" | "consensus";
+type Source = "mine" | "consensus" | "fanscout";
+
+type AnyPlayer = ScoredPlayer | ConsensusPlayer | FanscoutPlayer;
 
 type MySortKey =
   | "rank" | "name" | "pos" | "total" | "fgPct" | "ftPct"
@@ -15,6 +18,12 @@ type MySortKey =
 type ConsensusSortKey =
   | "rank" | "name" | "pos" | "total" | "fgZ" | "ftZ" | "tpmZ" | "tpPctZ"
   | "orebZ" | "drebZ" | "astZ" | "atoZ" | "stlZ" | "blkZ" | "ptsZ" | "catWins" | "tier";
+
+type FanscoutSortKey =
+  | "rank" | "name" | "pos" | "total" | "pts" | "tpm" | "oreb" | "dreb" | "ast"
+  | "stl" | "blk" | "ato" | "fgPct" | "ftPct";
+
+type SortKey = MySortKey | ConsensusSortKey | FanscoutSortKey;
 
 const TIER_COLOR: Record<string, string> = {
   Elite: "text-accent",
@@ -27,6 +36,7 @@ const TIER_COLOR: Record<string, string> = {
 export default function DraftBoard({
   myPlayers,
   consensusPlayers,
+  fanscoutPlayers,
   teams,
   draftState,
   setDraftState,
@@ -34,21 +44,25 @@ export default function DraftBoard({
 }: {
   myPlayers: ScoredPlayer[];
   consensusPlayers: ConsensusPlayer[];
+  fanscoutPlayers: FanscoutPlayer[];
   teams: string[];
   draftState: DraftState;
   setDraftState: (updater: (prev: DraftState) => DraftState) => void;
   onSelectPlayer: (name: string) => void;
 }) {
   const [source, setSource] = useState<Source>("mine");
-  const [mySortKey, setMySortKey] = useState<MySortKey>("rank");
-  const [mySortAsc, setMySortAsc] = useState(true);
-  const [cSortKey, setCSortKey] = useState<ConsensusSortKey>("rank");
-  const [cSortAsc, setCSortAsc] = useState(true);
+  const [sortKeyBySource, setSortKeyBySource] = useState<Record<Source, SortKey>>({
+    mine: "rank", consensus: "rank", fanscout: "rank",
+  });
+  const [sortAscBySource, setSortAscBySource] = useState<Record<Source, boolean>>({
+    mine: true, consensus: true, fanscout: true,
+  });
   const [search, setSearch] = useState("");
   const [posFilter, setPosFilter] = useState("ALL");
   const [hideDrafted, setHideDrafted] = useState(false);
 
-  const activePlayers = source === "mine" ? myPlayers : consensusPlayers;
+  const activePlayers: AnyPlayer[] =
+    source === "mine" ? myPlayers : source === "consensus" ? consensusPlayers : fanscoutPlayers;
 
   const positions = useMemo(() => {
     const set = new Set(activePlayers.map((p) => p.pos));
@@ -66,11 +80,11 @@ export default function DraftBoard({
     return list;
   }, [activePlayers, search, posFilter, hideDrafted, draftState]);
 
-  const sortKey = source === "mine" ? mySortKey : cSortKey;
-  const sortAsc = source === "mine" ? mySortAsc : cSortAsc;
+  const sortKey = sortKeyBySource[source];
+  const sortAsc = sortAscBySource[source];
 
   const sorted = useMemo(() => {
-    const getValue = (p: ScoredPlayer | ConsensusPlayer): number | string => {
+    const getValue = (p: AnyPlayer): number | string => {
       // @ts-expect-error - narrowed by source at call sites
       return p[sortKey];
     };
@@ -86,15 +100,15 @@ export default function DraftBoard({
     return arr;
   }, [filtered, sortKey, sortAsc]);
 
-  const toggleSort = (key: MySortKey | ConsensusSortKey) => {
-    if (source === "mine") {
-      const k = key as MySortKey;
-      if (mySortKey === k) setMySortAsc(!mySortAsc);
-      else { setMySortKey(k); setMySortAsc(k === "rank" || k === "name" || k === "pos"); }
+  const toggleSort = (key: SortKey) => {
+    if (sortKeyBySource[source] === key) {
+      setSortAscBySource((prev) => ({ ...prev, [source]: !prev[source] }));
     } else {
-      const k = key as ConsensusSortKey;
-      if (cSortKey === k) setCSortAsc(!cSortAsc);
-      else { setCSortKey(k); setCSortAsc(k === "rank" || k === "name" || k === "pos" || k === "tier"); }
+      setSortKeyBySource((prev) => ({ ...prev, [source]: key }));
+      setSortAscBySource((prev) => ({
+        ...prev,
+        [source]: key === "rank" || key === "name" || key === "pos" || key === "tier",
+      }));
     }
   };
 
@@ -120,7 +134,7 @@ export default function DraftBoard({
 
   const draftedCount = Object.values(draftState).filter((v) => v.draftedBy).length;
 
-  const headerCell = (label: string, key: MySortKey | ConsensusSortKey) => (
+  const headerCell = (label: string, key: SortKey) => (
     <th
       onClick={() => toggleSort(key)}
       className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:text-text-secondary transition-colors"
@@ -129,27 +143,26 @@ export default function DraftBoard({
     </th>
   );
 
+  const sourceLabel: Record<Source, string> = {
+    mine: "Your custom rankings — z-scores computed from raw 2025-26 per-game stats.",
+    consensus: "Consensus rankings — a second, independently pre-scored source (projected + estimated categories).",
+    fanscout: "FanScout projections — real 2026-27 per-game projections with their own value score (10 of 11 categories match your league; only 3P% is missing).",
+  };
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="inline-flex rounded-lg border border-border-subtle bg-surface p-1">
-          <SourceButton active={source === "mine"} onClick={() => setSource("mine")}>
-            My Rankings
-          </SourceButton>
-          <SourceButton active={source === "consensus"} onClick={() => setSource("consensus")}>
-            Consensus
-          </SourceButton>
+          <SourceButton active={source === "mine"} onClick={() => setSource("mine")}>My Rankings</SourceButton>
+          <SourceButton active={source === "consensus"} onClick={() => setSource("consensus")}>Consensus</SourceButton>
+          <SourceButton active={source === "fanscout"} onClick={() => setSource("fanscout")}>FanScout</SourceButton>
         </div>
         <p className="text-text-muted text-xs tabular">
           {draftedCount} of {activePlayers.length} drafted
         </p>
       </div>
 
-      <p className="text-text-secondary text-sm mb-4">
-        {source === "mine"
-          ? "Your custom rankings — z-scores computed from raw 2025-26 per-game stats."
-          : "Consensus rankings — a second, independently pre-scored source (projected + estimated categories)."}
-      </p>
+      <p className="text-text-secondary text-sm mb-4">{sourceLabel[source]}</p>
 
       <div className="flex flex-wrap gap-3 mb-4 items-center">
         <input
@@ -186,35 +199,29 @@ export default function DraftBoard({
                 {headerCell("Player", "name")}
                 {headerCell("Pos", "pos")}
                 {headerCell("Score", "total")}
-                {source === "mine" ? (
+                {source === "mine" && (
                   <>
-                    {headerCell("FG%", "fgPct")}
-                    {headerCell("FT%", "ftPct")}
-                    {headerCell("3PM", "tpm")}
-                    {headerCell("3P%", "tpPct")}
-                    {headerCell("OREB", "oreb")}
-                    {headerCell("DREB", "dreb")}
-                    {headerCell("AST", "ast")}
-                    {headerCell("A/TO", "ato")}
-                    {headerCell("STL", "stl")}
-                    {headerCell("BLK", "blk")}
-                    {headerCell("PTS", "pts")}
+                    {headerCell("FG%", "fgPct")}{headerCell("FT%", "ftPct")}{headerCell("3PM", "tpm")}
+                    {headerCell("3P%", "tpPct")}{headerCell("OREB", "oreb")}{headerCell("DREB", "dreb")}
+                    {headerCell("AST", "ast")}{headerCell("A/TO", "ato")}{headerCell("STL", "stl")}
+                    {headerCell("BLK", "blk")}{headerCell("PTS", "pts")}
                   </>
-                ) : (
+                )}
+                {source === "consensus" && (
                   <>
-                    {headerCell("FG% z", "fgZ")}
-                    {headerCell("FT% z", "ftZ")}
-                    {headerCell("3PM z", "tpmZ")}
-                    {headerCell("3P% z", "tpPctZ")}
-                    {headerCell("OREB z", "orebZ")}
-                    {headerCell("DREB z", "drebZ")}
-                    {headerCell("AST z", "astZ")}
-                    {headerCell("A/TO z", "atoZ")}
-                    {headerCell("STL z", "stlZ")}
-                    {headerCell("BLK z", "blkZ")}
-                    {headerCell("PTS z", "ptsZ")}
-                    {headerCell("Cat Wins", "catWins")}
+                    {headerCell("FG% z", "fgZ")}{headerCell("FT% z", "ftZ")}{headerCell("3PM z", "tpmZ")}
+                    {headerCell("3P% z", "tpPctZ")}{headerCell("OREB z", "orebZ")}{headerCell("DREB z", "drebZ")}
+                    {headerCell("AST z", "astZ")}{headerCell("A/TO z", "atoZ")}{headerCell("STL z", "stlZ")}
+                    {headerCell("BLK z", "blkZ")}{headerCell("PTS z", "ptsZ")}{headerCell("Cat Wins", "catWins")}
                     {headerCell("Tier", "tier")}
+                  </>
+                )}
+                {source === "fanscout" && (
+                  <>
+                    {headerCell("PTS", "pts")}{headerCell("3PM", "tpm")}{headerCell("OREB", "oreb")}
+                    {headerCell("DREB", "dreb")}{headerCell("AST", "ast")}{headerCell("A/TO", "ato")}
+                    {headerCell("STL", "stl")}{headerCell("BLK", "blk")}{headerCell("FG%", "fgPct")}
+                    {headerCell("FT%", "ftPct")}
                   </>
                 )}
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Drafted By</th>
@@ -225,9 +232,9 @@ export default function DraftBoard({
               {sorted.map((p, idx) => {
                 const key = normalizeName(p.name);
                 const isDrafted = !!draftState[key]?.draftedBy;
-                const isMine = source === "mine";
                 const mp = p as ScoredPlayer;
                 const cp = p as ConsensusPlayer;
+                const fp = p as FanscoutPlayer;
                 return (
                   <tr
                     key={p.name}
@@ -237,16 +244,13 @@ export default function DraftBoard({
                   >
                     <td className="px-3 py-2 tabular text-text-muted">{p.rank}</td>
                     <td className="px-3 py-2 font-medium whitespace-nowrap">
-                      <button
-                        onClick={() => onSelectPlayer(p.name)}
-                        className="text-text-primary hover:text-accent transition-colors text-left"
-                      >
+                      <button onClick={() => onSelectPlayer(p.name)} className="text-text-primary hover:text-accent transition-colors text-left">
                         {p.name}
                       </button>
                     </td>
                     <td className="px-3 py-2 text-text-muted text-xs">{p.pos}</td>
                     <td className="px-3 py-2 tabular font-medium text-accent">{p.total.toFixed(2)}</td>
-                    {isMine ? (
+                    {source === "mine" && (
                       <>
                         <td className="px-3 py-2 tabular text-text-secondary">{(mp.fgPct * 100).toFixed(1)}%</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{(mp.ftPct * 100).toFixed(1)}%</td>
@@ -260,7 +264,8 @@ export default function DraftBoard({
                         <td className="px-3 py-2 tabular text-text-secondary">{mp.blk.toFixed(1)}</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{mp.pts.toFixed(1)}</td>
                       </>
-                    ) : (
+                    )}
+                    {source === "consensus" && (
                       <>
                         <td className="px-3 py-2 tabular text-text-secondary">{cp.fgZ.toFixed(2)}</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{cp.ftZ.toFixed(2)}</td>
@@ -275,6 +280,20 @@ export default function DraftBoard({
                         <td className="px-3 py-2 tabular text-text-secondary">{cp.ptsZ.toFixed(2)}</td>
                         <td className="px-3 py-2 tabular text-text-secondary">{cp.catWins}</td>
                         <td className={`px-3 py-2 text-xs font-medium ${TIER_COLOR[cp.tier] ?? "text-text-secondary"}`}>{cp.tier}</td>
+                      </>
+                    )}
+                    {source === "fanscout" && (
+                      <>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.pts.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.tpm.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.oreb.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.dreb.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.ast.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.ato.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.stl.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.blk.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(fp.fgPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(fp.ftPct * 100).toFixed(1)}%</td>
                       </>
                     )}
                     <td className="px-3 py-2">

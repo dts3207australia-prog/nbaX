@@ -3,12 +3,15 @@
 import { useEffect, useState } from "react";
 import type { ScoredPlayer } from "@/lib/scoring";
 import type { ConsensusPlayer } from "@/lib/consensus";
+import type { FanscoutPlayer } from "@/lib/fanscout";
 import { normalizeName } from "@/lib/names";
 import { NUM_TEAMS } from "@/lib/roster";
 import { defaultTeams, TEAMS_STORAGE_KEY } from "@/lib/teams";
+import { computeRecommendations } from "@/lib/recommendation";
 import DraftBoard from "./DraftBoard";
 import MyTeam from "./MyTeam";
 import PlayerProfile from "./PlayerProfile";
+import RecommendationCard from "./RecommendationCard";
 
 const STORAGE_KEY = "nba-draft-manager-state-v2";
 
@@ -21,9 +24,11 @@ const DRAFT_DATE = new Date("2026-10-17T14:00:00+11:00");
 export default function AppShell({
   myPlayers,
   consensusPlayers,
+  fanscoutPlayers,
 }: {
   myPlayers: ScoredPlayer[];
   consensusPlayers: ConsensusPlayer[];
+  fanscoutPlayers: FanscoutPlayer[];
 }) {
   const [tab, setTab] = useState<Tab>("board");
   const [draftState, setDraftState] = useState<DraftState>({});
@@ -75,6 +80,20 @@ export default function AppShell({
       };
     })
     .filter((p): p is { name: string; pos: string; score: number } => p !== null);
+
+  const availableMyPlayers = myPlayers.filter(
+    (p) => !draftState[normalizeName(p.name)]?.draftedBy
+  );
+  const availableConsensus = consensusPlayers.filter(
+    (p) => !draftState[normalizeName(p.name)]?.draftedBy
+  );
+  const recommendations = computeRecommendations({
+    availableMyPlayers,
+    availableConsensus,
+    allMyPlayers: myPlayers,
+    allConsensus: consensusPlayers,
+    myRosterPlayers,
+  });
 
   const syncWithEspn = async () => {
     setSyncing(true);
@@ -213,14 +232,22 @@ export default function AppShell({
         </div>
 
         {tab === "board" ? (
-          <DraftBoard
-            myPlayers={myPlayers}
-            consensusPlayers={consensusPlayers}
-            teams={teams}
-            draftState={draftState}
-            setDraftState={setDraftState}
-            onSelectPlayer={setProfilePlayer}
-          />
+          <>
+            <RecommendationCard
+              recommendations={recommendations}
+              onSelectPlayer={setProfilePlayer}
+              hasConsensusData={consensusPlayers.length > 0}
+            />
+            <DraftBoard
+              myPlayers={myPlayers}
+              consensusPlayers={consensusPlayers}
+              fanscoutPlayers={fanscoutPlayers}
+              teams={teams}
+              draftState={draftState}
+              setDraftState={setDraftState}
+              onSelectPlayer={setProfilePlayer}
+            />
+          </>
         ) : (
           <MyTeam players={myRosterPlayers} />
         )}
@@ -230,6 +257,7 @@ export default function AppShell({
             name={profilePlayer}
             myPlayers={myPlayers}
             consensusPlayers={consensusPlayers}
+            fanscoutPlayers={fanscoutPlayers}
             onClose={() => setProfilePlayer(null)}
           />
         )}
