@@ -54,11 +54,11 @@ name, automatically.
 2. Copy the values of the `espn_s2` and `SWID` cookies (SWID includes the
    curly braces).
 3. In your Vercel project: Settings → Environment Variables, add:
-   - `ESPN_S2` = (the espn_s2 value)
-   - `ESPN_SWID` = (the SWID value, including `{ }`)
-   - `ESPN_LEAGUE_ID` = `85907` (only needed if it ever changes)
-   - `ESPN_SEASON_ID` = `2027` (ESPN's season-end year, e.g. 2026-27 → 2027)
-   - `ESPN_TEAM_ID` = `20` (your team ID, used to detect "My Team")
+   - `ESPNS2` = (the espn_s2 value)
+   - `ESPNSWID` = (the SWID value, including `{ }`)
+   - `ESPNLEAGUEID` = `85907` (only needed if it ever changes)
+   - `ESPNSEASONID` = `2027` (ESPN's season-end year, e.g. 2026-27 → 2027)
+   - `ESPNTEAMID` = `20` (your team ID, used to detect "My Team")
 4. Redeploy (Vercel → Deployments → ⋯ → Redeploy) so the new env vars take effect.
 
 These cookies are read only server-side, inside `/app/api/espn/route.ts` —

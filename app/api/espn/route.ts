@@ -4,9 +4,9 @@ import { NextResponse } from "next/server";
 // variables and never sent to the browser — this route only returns the
 // simplified team/roster data derived from them.
 
-const LEAGUE_ID = process.env.ESPN_LEAGUE_ID ?? "85907";
-const SEASON_ID = process.env.ESPN_SEASON_ID ?? "2027";
-const MY_TEAM_ID = process.env.ESPN_TEAM_ID ?? "20";
+const LEAGUE_ID = process.env.ESPNLEAGUEID ?? "85907";
+const SEASON_ID = process.env.ESPNSEASONID ?? "2027";
+const MY_TEAM_ID = process.env.ESPNTEAMID ?? "20";
 
 type EspnPlayer = {
   fullName: string;
@@ -26,12 +26,12 @@ type EspnTeam = {
 };
 
 export async function GET() {
-  const s2 = process.env.ESPN_S2;
-  const swid = process.env.ESPN_SWID;
+  const s2 = process.env.ESPNS2;
+  const swid = process.env.ESPNSWID;
 
   if (!s2 || !swid) {
     return NextResponse.json(
-      { error: "ESPN_S2 and ESPN_SWID environment variables are not set on this deployment." },
+      { error: "ESPNS2 and ESPNSWID environment variables are not set on this deployment." },
       { status: 400 }
     );
   }
@@ -52,7 +52,7 @@ export async function GET() {
 
   if (!res.ok) {
     return NextResponse.json(
-      { error: `ESPN returned ${res.status}. Cookies may be expired — re-copy espn_s2 and SWID and update them in Vercel.` },
+      { error: `ESPN returned ${res.status}. Cookies may be expired — re-copy espn_s2 and SWID and update ESPNS2/ESPNSWID in Vercel.` },
       { status: res.status }
     );
   }

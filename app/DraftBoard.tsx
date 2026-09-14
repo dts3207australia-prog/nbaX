@@ -16,6 +16,14 @@ type ConsensusSortKey =
   | "rank" | "name" | "pos" | "total" | "fgZ" | "ftZ" | "tpmZ" | "tpPctZ"
   | "orebZ" | "drebZ" | "astZ" | "atoZ" | "stlZ" | "blkZ" | "ptsZ" | "catWins" | "tier";
 
+const TIER_COLOR: Record<string, string> = {
+  Elite: "text-accent",
+  Strong: "text-status-positive",
+  Solid: "text-info",
+  "Mid-Round": "text-text-secondary",
+  Late: "text-text-muted",
+};
+
 export default function DraftBoard({
   myPlayers,
   consensusPlayers,
@@ -115,39 +123,33 @@ export default function DraftBoard({
   const headerCell = (label: string, key: MySortKey | ConsensusSortKey) => (
     <th
       onClick={() => toggleSort(key)}
-      className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap hover:bg-slate-700"
+      className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:text-text-secondary transition-colors"
     >
-      {label} {sortKey === key ? (sortAsc ? "▲" : "▼") : ""}
+      {label} {sortKey === key ? (sortAsc ? "↑" : "↓") : ""}
     </th>
   );
 
   return (
     <div>
-      <p className="text-slate-400 text-sm mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="inline-flex rounded-lg border border-border-subtle bg-surface p-1">
+          <SourceButton active={source === "mine"} onClick={() => setSource("mine")}>
+            My Rankings
+          </SourceButton>
+          <SourceButton active={source === "consensus"} onClick={() => setSource("consensus")}>
+            Consensus
+          </SourceButton>
+        </div>
+        <p className="text-text-muted text-xs tabular">
+          {draftedCount} of {activePlayers.length} drafted
+        </p>
+      </div>
+
+      <p className="text-text-secondary text-sm mb-4">
         {source === "mine"
           ? "Your custom rankings — z-scores computed from raw 2025-26 per-game stats."
-          : "Consensus rankings — a second, independently pre-scored ranking source (projected + estimated categories)."}
-        {" "}{draftedCount} of {activePlayers.length} drafted.
+          : "Consensus rankings — a second, independently pre-scored source (projected + estimated categories)."}
       </p>
-
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setSource("mine")}
-          className={`px-4 py-2 rounded text-sm font-medium border ${
-            source === "mine" ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
-          }`}
-        >
-          My Rankings
-        </button>
-        <button
-          onClick={() => setSource("consensus")}
-          className={`px-4 py-2 rounded text-sm font-medium border ${
-            source === "consensus" ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
-          }`}
-        >
-          Consensus Rankings
-        </button>
-      </div>
 
       <div className="flex flex-wrap gap-3 mb-4 items-center">
         <input
@@ -155,155 +157,182 @@ export default function DraftBoard({
           placeholder="Search player..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="bg-surface border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent w-48"
         />
         <select
           value={posFilter}
           onChange={(e) => setPosFilter(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-100"
+          className="bg-surface border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
         >
           {positions.map((p) => (
             <option key={p} value={p}>{p === "ALL" ? "All positions" : p}</option>
           ))}
         </select>
-        <label className="flex items-center gap-2 text-sm text-slate-300">
-          <input type="checkbox" checked={hideDrafted} onChange={(e) => setHideDrafted(e.target.checked)} />
+        <label className="flex items-center gap-2 text-sm text-text-secondary select-none cursor-pointer">
+          <input type="checkbox" checked={hideDrafted} onChange={(e) => setHideDrafted(e.target.checked)} className="accent-[var(--accent)]" />
           Hide drafted
         </label>
-        <button onClick={clearAll} className="ml-auto text-xs text-red-400 hover:text-red-300 underline">
+        <button onClick={clearAll} className="ml-auto text-xs text-status-negative/80 hover:text-status-negative underline">
           Reset draft board
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-700">
-        <table className="min-w-full text-sm text-slate-200">
-          <thead className="bg-slate-800 text-slate-300 sticky top-0">
-            <tr>
-              {headerCell("Rank", "rank")}
-              {headerCell("Player", "name")}
-              {headerCell("Pos", "pos")}
-              {headerCell("Score", "total")}
-              {source === "mine" ? (
-                <>
-                  {headerCell("FG%", "fgPct")}
-                  {headerCell("FT%", "ftPct")}
-                  {headerCell("3PM", "tpm")}
-                  {headerCell("3P%", "tpPct")}
-                  {headerCell("OREB", "oreb")}
-                  {headerCell("DREB", "dreb")}
-                  {headerCell("AST", "ast")}
-                  {headerCell("A/TO", "ato")}
-                  {headerCell("STL", "stl")}
-                  {headerCell("BLK", "blk")}
-                  {headerCell("PTS", "pts")}
-                </>
-              ) : (
-                <>
-                  {headerCell("FG% z", "fgZ")}
-                  {headerCell("FT% z", "ftZ")}
-                  {headerCell("3PM z", "tpmZ")}
-                  {headerCell("3P% z", "tpPctZ")}
-                  {headerCell("OREB z", "orebZ")}
-                  {headerCell("DREB z", "drebZ")}
-                  {headerCell("AST z", "astZ")}
-                  {headerCell("A/TO z", "atoZ")}
-                  {headerCell("STL z", "stlZ")}
-                  {headerCell("BLK z", "blkZ")}
-                  {headerCell("PTS z", "ptsZ")}
-                  {headerCell("Cat Wins", "catWins")}
-                  {headerCell("Tier", "tier")}
-                </>
-              )}
-              <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide">Drafted By</th>
-              <th className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide">Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((p) => {
-              const key = normalizeName(p.name);
-              const isDrafted = !!draftState[key]?.draftedBy;
-              const isMine = source === "mine";
-              const mp = p as ScoredPlayer;
-              const cp = p as ConsensusPlayer;
-              return (
-                <tr
-                  key={p.name}
-                  className={`border-t border-slate-800 ${isDrafted ? "bg-slate-900/60 opacity-50" : "hover:bg-slate-800/50"}`}
-                >
-                  <td className="px-2 py-1.5 font-mono">{p.rank}</td>
-                  <td className="px-2 py-1.5 font-medium whitespace-nowrap">
-                    <button
-                      onClick={() => onSelectPlayer(p.name)}
-                      className="hover:text-blue-400 hover:underline text-left"
-                    >
-                      {p.name}
-                    </button>
-                  </td>
-                  <td className="px-2 py-1.5 text-slate-400">{p.pos}</td>
-                  <td className="px-2 py-1.5 font-mono">{p.total.toFixed(2)}</td>
-                  {isMine ? (
-                    <>
-                      <td className="px-2 py-1.5 font-mono">{(mp.fgPct * 100).toFixed(1)}%</td>
-                      <td className="px-2 py-1.5 font-mono">{(mp.ftPct * 100).toFixed(1)}%</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.tpm.toFixed(1)}</td>
-                      <td className="px-2 py-1.5 font-mono">{(mp.tpPct * 100).toFixed(1)}%</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.oreb.toFixed(1)}</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.dreb.toFixed(1)}</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.ast.toFixed(1)}</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.ato.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.stl.toFixed(1)}</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.blk.toFixed(1)}</td>
-                      <td className="px-2 py-1.5 font-mono">{mp.pts.toFixed(1)}</td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-2 py-1.5 font-mono">{cp.fgZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.ftZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.tpmZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.tpPctZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.orebZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.drebZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.astZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.atoZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.stlZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.blkZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.ptsZ.toFixed(2)}</td>
-                      <td className="px-2 py-1.5 font-mono">{cp.catWins}</td>
-                      <td className="px-2 py-1.5">{cp.tier}</td>
-                    </>
-                  )}
-                  <td className="px-2 py-1.5">
-                    <select
-                      value={draftState[key]?.draftedBy ?? ""}
-                      onChange={(e) => updateDrafted(p.name, e.target.value)}
-                      className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-100 w-28"
-                    >
-                      <option value="">Available</option>
-                      {teams.map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      value={draftState[key]?.note ?? ""}
-                      onChange={(e) => updateNote(p.name, e.target.value)}
-                      placeholder="Note"
-                      className="w-32 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-100"
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="rounded-xl border border-border-subtle bg-surface overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-surface-raised text-text-muted border-b border-border-subtle sticky top-0">
+              <tr>
+                {headerCell("Rank", "rank")}
+                {headerCell("Player", "name")}
+                {headerCell("Pos", "pos")}
+                {headerCell("Score", "total")}
+                {source === "mine" ? (
+                  <>
+                    {headerCell("FG%", "fgPct")}
+                    {headerCell("FT%", "ftPct")}
+                    {headerCell("3PM", "tpm")}
+                    {headerCell("3P%", "tpPct")}
+                    {headerCell("OREB", "oreb")}
+                    {headerCell("DREB", "dreb")}
+                    {headerCell("AST", "ast")}
+                    {headerCell("A/TO", "ato")}
+                    {headerCell("STL", "stl")}
+                    {headerCell("BLK", "blk")}
+                    {headerCell("PTS", "pts")}
+                  </>
+                ) : (
+                  <>
+                    {headerCell("FG% z", "fgZ")}
+                    {headerCell("FT% z", "ftZ")}
+                    {headerCell("3PM z", "tpmZ")}
+                    {headerCell("3P% z", "tpPctZ")}
+                    {headerCell("OREB z", "orebZ")}
+                    {headerCell("DREB z", "drebZ")}
+                    {headerCell("AST z", "astZ")}
+                    {headerCell("A/TO z", "atoZ")}
+                    {headerCell("STL z", "stlZ")}
+                    {headerCell("BLK z", "blkZ")}
+                    {headerCell("PTS z", "ptsZ")}
+                    {headerCell("Cat Wins", "catWins")}
+                    {headerCell("Tier", "tier")}
+                  </>
+                )}
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Drafted By</th>
+                <th className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((p, idx) => {
+                const key = normalizeName(p.name);
+                const isDrafted = !!draftState[key]?.draftedBy;
+                const isMine = source === "mine";
+                const mp = p as ScoredPlayer;
+                const cp = p as ConsensusPlayer;
+                return (
+                  <tr
+                    key={p.name}
+                    className={`border-b border-border-subtle last:border-b-0 transition-colors ${
+                      isDrafted ? "opacity-40" : idx % 2 === 0 ? "bg-surface" : "bg-surface-raised/40"
+                    } hover:bg-surface-raised`}
+                  >
+                    <td className="px-3 py-2 tabular text-text-muted">{p.rank}</td>
+                    <td className="px-3 py-2 font-medium whitespace-nowrap">
+                      <button
+                        onClick={() => onSelectPlayer(p.name)}
+                        className="text-text-primary hover:text-accent transition-colors text-left"
+                      >
+                        {p.name}
+                      </button>
+                    </td>
+                    <td className="px-3 py-2 text-text-muted text-xs">{p.pos}</td>
+                    <td className="px-3 py-2 tabular font-medium text-accent">{p.total.toFixed(2)}</td>
+                    {isMine ? (
+                      <>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(mp.fgPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(mp.ftPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.tpm.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(mp.tpPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.oreb.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.dreb.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.ast.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.ato.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.stl.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.blk.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{mp.pts.toFixed(1)}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.fgZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.ftZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.tpmZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.tpPctZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.orebZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.drebZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.astZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.atoZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.stlZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.blkZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.ptsZ.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{cp.catWins}</td>
+                        <td className={`px-3 py-2 text-xs font-medium ${TIER_COLOR[cp.tier] ?? "text-text-secondary"}`}>{cp.tier}</td>
+                      </>
+                    )}
+                    <td className="px-3 py-2">
+                      <select
+                        value={draftState[key]?.draftedBy ?? ""}
+                        onChange={(e) => updateDrafted(p.name, e.target.value)}
+                        className={`bg-surface-raised border rounded-md px-2 py-1 text-xs w-28 focus:outline-none focus:ring-1 focus:ring-accent ${
+                          isDrafted ? "border-status-negative/40 text-status-negative" : "border-border-subtle text-text-secondary"
+                        }`}
+                      >
+                        <option value="">Available</option>
+                        {teams.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="text"
+                        value={draftState[key]?.note ?? ""}
+                        onChange={(e) => updateNote(p.name, e.target.value)}
+                        placeholder="—"
+                        className="w-32 bg-transparent border-b border-transparent hover:border-border-subtle focus:border-accent focus:outline-none px-1 py-1 text-xs text-text-secondary placeholder-text-muted transition-colors"
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <p className="text-xs text-slate-500 mt-3">
+      <p className="text-xs text-text-muted mt-3">
         Click a player&apos;s name for their full multi-source profile. Drafted-by
         tags, notes, and team names are saved locally in your browser only.
       </p>
     </div>
+  );
+}
+
+function SourceButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+        active ? "bg-accent text-[#0A0E14]" : "text-text-secondary hover:text-text-primary"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
