@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ScoredPlayer } from "@/lib/scoring";
 import type { ConsensusPlayer } from "@/lib/consensus";
 import { normalizeName } from "@/lib/names";
+import type { DraftState } from "./AppShell";
 
 type Source = "mine" | "consensus";
 
@@ -15,16 +16,20 @@ type ConsensusSortKey =
   | "rank" | "name" | "pos" | "total" | "fgZ" | "ftZ" | "tpmZ" | "tpPctZ"
   | "orebZ" | "drebZ" | "astZ" | "atoZ" | "stlZ" | "blkZ" | "ptsZ" | "catWins" | "tier";
 
-const STORAGE_KEY = "nba-draft-manager-state-v2";
-
-type DraftState = Record<string, { draftedBy: string; note: string }>;
-
 export default function DraftBoard({
   myPlayers,
   consensusPlayers,
+  teams,
+  draftState,
+  setDraftState,
+  onSelectPlayer,
 }: {
   myPlayers: ScoredPlayer[];
   consensusPlayers: ConsensusPlayer[];
+  teams: string[];
+  draftState: DraftState;
+  setDraftState: (updater: (prev: DraftState) => DraftState) => void;
+  onSelectPlayer: (name: string) => void;
 }) {
   const [source, setSource] = useState<Source>("mine");
   const [mySortKey, setMySortKey] = useState<MySortKey>("rank");
@@ -34,24 +39,6 @@ export default function DraftBoard({
   const [search, setSearch] = useState("");
   const [posFilter, setPosFilter] = useState("ALL");
   const [hideDrafted, setHideDrafted] = useState(false);
-  const [draftState, setDraftState] = useState<DraftState>({});
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setDraftState(JSON.parse(saved));
-      } catch {
-        // ignore corrupt storage
-      }
-    }
-    setLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(draftState));
-  }, [draftState, loaded]);
 
   const activePlayers = source === "mine" ? myPlayers : consensusPlayers;
 
@@ -77,8 +64,7 @@ export default function DraftBoard({
   const sorted = useMemo(() => {
     const getValue = (p: ScoredPlayer | ConsensusPlayer): number | string => {
       // @ts-expect-error - narrowed by source at call sites
-      const v = p[sortKey];
-      return v;
+      return p[sortKey];
     };
     const arr = [...filtered];
     arr.sort((a, b) => {
@@ -96,17 +82,11 @@ export default function DraftBoard({
     if (source === "mine") {
       const k = key as MySortKey;
       if (mySortKey === k) setMySortAsc(!mySortAsc);
-      else {
-        setMySortKey(k);
-        setMySortAsc(k === "rank" || k === "name" || k === "pos");
-      }
+      else { setMySortKey(k); setMySortAsc(k === "rank" || k === "name" || k === "pos"); }
     } else {
       const k = key as ConsensusSortKey;
       if (cSortKey === k) setCSortAsc(!cSortAsc);
-      else {
-        setCSortKey(k);
-        setCSortAsc(k === "rank" || k === "name" || k === "pos" || k === "tier");
-      }
+      else { setCSortKey(k); setCSortAsc(k === "rank" || k === "name" || k === "pos" || k === "tier"); }
     }
   };
 
@@ -126,42 +106,35 @@ export default function DraftBoard({
   };
   const clearAll = () => {
     if (confirm("Clear all drafted-by tags and notes?")) {
-      setDraftState({});
+      setDraftState(() => ({}));
     }
   };
 
   const draftedCount = Object.values(draftState).filter((v) => v.draftedBy).length;
 
-  const headerCell = (label: string, key: MySortKey | ConsensusSortKey, extraClass = "") => (
+  const headerCell = (label: string, key: MySortKey | ConsensusSortKey) => (
     <th
       onClick={() => toggleSort(key)}
-      className={`px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap hover:bg-slate-700 ${extraClass}`}
+      className="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap hover:bg-slate-700"
     >
       {label} {sortKey === key ? (sortAsc ? "▲" : "▼") : ""}
     </th>
   );
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6">
-      <header className="mb-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-100">
-          NBA Draft Manager
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          {source === "mine"
-            ? "Your custom rankings — z-scores computed from raw 2025-26 per-game stats."
-            : "Consensus rankings — a second, independently pre-scored ranking source (projected + estimated categories)."}
-          {" "}{draftedCount} of {activePlayers.length} drafted.
-        </p>
-      </header>
+    <div>
+      <p className="text-slate-400 text-sm mb-3">
+        {source === "mine"
+          ? "Your custom rankings — z-scores computed from raw 2025-26 per-game stats."
+          : "Consensus rankings — a second, independently pre-scored ranking source (projected + estimated categories)."}
+        {" "}{draftedCount} of {activePlayers.length} drafted.
+      </p>
 
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setSource("mine")}
           className={`px-4 py-2 rounded text-sm font-medium border ${
-            source === "mine"
-              ? "bg-blue-600 border-blue-500 text-white"
-              : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+            source === "mine" ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
           }`}
         >
           My Rankings
@@ -169,9 +142,7 @@ export default function DraftBoard({
         <button
           onClick={() => setSource("consensus")}
           className={`px-4 py-2 rounded text-sm font-medium border ${
-            source === "consensus"
-              ? "bg-blue-600 border-blue-500 text-white"
-              : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+            source === "consensus" ? "bg-blue-600 border-blue-500 text-white" : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
           }`}
         >
           Consensus Rankings
@@ -196,17 +167,10 @@ export default function DraftBoard({
           ))}
         </select>
         <label className="flex items-center gap-2 text-sm text-slate-300">
-          <input
-            type="checkbox"
-            checked={hideDrafted}
-            onChange={(e) => setHideDrafted(e.target.checked)}
-          />
+          <input type="checkbox" checked={hideDrafted} onChange={(e) => setHideDrafted(e.target.checked)} />
           Hide drafted
         </label>
-        <button
-          onClick={clearAll}
-          className="ml-auto text-xs text-red-400 hover:text-red-300 underline"
-        >
+        <button onClick={clearAll} className="ml-auto text-xs text-red-400 hover:text-red-300 underline">
           Reset draft board
         </button>
       </div>
@@ -264,12 +228,17 @@ export default function DraftBoard({
               return (
                 <tr
                   key={p.name}
-                  className={`border-t border-slate-800 ${
-                    isDrafted ? "bg-slate-900/60 opacity-50" : "hover:bg-slate-800/50"
-                  }`}
+                  className={`border-t border-slate-800 ${isDrafted ? "bg-slate-900/60 opacity-50" : "hover:bg-slate-800/50"}`}
                 >
                   <td className="px-2 py-1.5 font-mono">{p.rank}</td>
-                  <td className="px-2 py-1.5 font-medium whitespace-nowrap">{p.name}</td>
+                  <td className="px-2 py-1.5 font-medium whitespace-nowrap">
+                    <button
+                      onClick={() => onSelectPlayer(p.name)}
+                      className="hover:text-blue-400 hover:underline text-left"
+                    >
+                      {p.name}
+                    </button>
+                  </td>
                   <td className="px-2 py-1.5 text-slate-400">{p.pos}</td>
                   <td className="px-2 py-1.5 font-mono">{p.total.toFixed(2)}</td>
                   {isMine ? (
@@ -304,13 +273,16 @@ export default function DraftBoard({
                     </>
                   )}
                   <td className="px-2 py-1.5">
-                    <input
-                      type="text"
+                    <select
                       value={draftState[key]?.draftedBy ?? ""}
                       onChange={(e) => updateDrafted(p.name, e.target.value)}
-                      placeholder="Team name"
-                      className="w-24 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-100"
-                    />
+                      className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-slate-100 w-28"
+                    >
+                      <option value="">Available</option>
+                      {teams.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-2 py-1.5">
                     <input
@@ -329,8 +301,8 @@ export default function DraftBoard({
       </div>
 
       <p className="text-xs text-slate-500 mt-3">
-        Drafted-by tags and notes are shared between both ranking lists (matched by
-        player name) and saved locally in your browser only.
+        Click a player&apos;s name for their full multi-source profile. Drafted-by
+        tags, notes, and team names are saved locally in your browser only.
       </p>
     </div>
   );
