@@ -4,6 +4,8 @@ import type { ScoredPlayer } from "@/lib/scoring";
 import type { ConsensusPlayer } from "@/lib/consensus";
 import type { FanscoutPlayer } from "@/lib/fanscout";
 import { normalizeName } from "@/lib/names";
+import { getScheduleStrength } from "@/lib/schedule";
+import { TEAM_ABBR_TO_NAME } from "@/lib/teams.reference";
 
 export default function PlayerProfile({
   name,
@@ -23,6 +25,11 @@ export default function PlayerProfile({
   const consensus = consensusPlayers.find((p) => normalizeName(p.name) === key);
   const fanscout = fanscoutPlayers.find((p) => normalizeName(p.name) === key);
 
+  const teamFullName = fanscout ? TEAM_ABBR_TO_NAME[fanscout.team] : undefined;
+  const teamSos = teamFullName
+    ? getScheduleStrength().find((t) => t.team === teamFullName)
+    : undefined;
+
   const sources = [
     mine && { label: "My Rankings", rank: mine.rank, total: mine.total, outOf: myPlayers.length },
     consensus && { label: "Consensus", rank: consensus.rank, total: consensus.total, outOf: consensusPlayers.length },
@@ -30,8 +37,7 @@ export default function PlayerProfile({
   ].filter(Boolean) as { label: string; rank: number; total: number; outOf: number }[];
 
   // Normalize each source's rank onto a common 200-player scale before
-  // comparing — pool sizes differ (My Rankings: 481, Consensus: 200,
-  // FanScout: 481), so raw rank numbers aren't directly comparable.
+  // comparing — pool sizes differ (My Rankings/FanScout: 481, Consensus: 200).
   const scaledRanks = sources.map((s) => (s.rank / s.outOf) * 200);
   const rankRange = sources.length > 1
     ? `#${Math.round(Math.min(...scaledRanks))}–${Math.round(Math.max(...scaledRanks))}`
@@ -61,7 +67,7 @@ export default function PlayerProfile({
             <h2 className="font-display text-2xl font-medium text-text-primary tracking-wide">{name}</h2>
             <p className="text-sm text-text-muted mt-0.5">
               {mine?.pos ?? consensus?.pos ?? ""}
-              {consensus?.team ? ` · ${consensus.team}` : ""}
+              {(consensus?.team ?? fanscout?.team) ? ` · ${consensus?.team ?? fanscout?.team}` : ""}
             </p>
           </div>
           <button
@@ -192,6 +198,12 @@ export default function PlayerProfile({
                 {fanscout.team} · projected {fanscout.gamesPlayed ?? "—"} games, {fanscout.minutes?.toFixed(1) ?? "—"} min/game.
                 Matches 10 of your league&apos;s 11 categories — only 3P% isn&apos;t available from this source.
               </p>
+              {teamSos && (
+                <p className="text-xs text-text-muted mt-2">
+                  {teamSos.team} schedule: ranked <span className="text-text-secondary">#{teamSos.sosRank} of 30</span> toughest
+                  (avg opponent win total {teamSos.avgOpponentWinTotal.toFixed(1)}). See the Schedule tab for full league context.
+                </p>
+              )}
             </div>
           )}
 

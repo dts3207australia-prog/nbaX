@@ -17,11 +17,11 @@ const ICON: Record<Recommendation["reasons"][number]["icon"], string> = {
 export default function RecommendationCard({
   recommendations,
   onSelectPlayer,
-  hasConsensusData,
+  hasComparisonData,
 }: {
   recommendations: Recommendation[];
   onSelectPlayer: (name: string) => void;
-  hasConsensusData: boolean;
+  hasComparisonData: boolean;
 }) {
   if (recommendations.length === 0) {
     return (
@@ -89,7 +89,7 @@ export default function RecommendationCard({
         </div>
       )}
 
-      {!hasConsensusData && (
+      {!hasComparisonData && (
         <p className="text-xs text-text-muted mt-3">
           Confidence ratings are limited without a second source to compare against.
         </p>

@@ -77,7 +77,6 @@ export function computeRecommendations({
   const maxTotal = Math.max(...totals);
   const valueRange = maxTotal - minTotal || 1;
 
-  const consensusByKey = new Map(availableConsensus.map((p) => [normalizeName(p.name), p]));
   const allConsensusByKey = new Map(allConsensus.map((p) => [normalizeName(p.name), p]));
 
   const scored: Recommendation[] = availableMyPlayers.map((player) => {
@@ -95,8 +94,8 @@ export function computeRecommendations({
     ));
 
     // Confidence from cross-source rank variance, on a percentile basis —
-    // pool sizes differ (481 "mine" vs 200 consensus), so raw rank
-    // differences aren't comparable without normalizing first.
+    // Consensus is a genuinely independent source (unlike FanScout, which
+    // "My Rankings" is itself derived from), so this is a real second opinion.
     const consensusFull = allConsensusByKey.get(normalizeName(player.name));
     let confidence: Confidence = "LOW";
     let variancePct: number | null = null;
@@ -122,9 +121,6 @@ export function computeRecommendations({
     }
     if (variancePct !== null && variancePct > 12) {
       reasons.push({ icon: "caution", text: `Sources disagree substantially on this player — worth a second look` });
-    }
-    if (!consensusByKey.has(normalizeName(player.name)) && availableConsensus.length > 0) {
-      // present in "mine" but not matched in consensus at all
     }
 
     return { player, draftScore, confidence, reasons };

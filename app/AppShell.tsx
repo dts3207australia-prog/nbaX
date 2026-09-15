@@ -10,6 +10,7 @@ import { defaultTeams, TEAMS_STORAGE_KEY } from "@/lib/teams";
 import { computeRecommendations } from "@/lib/recommendation";
 import DraftBoard from "./DraftBoard";
 import MyTeam from "./MyTeam";
+import ScheduleStrength from "./ScheduleStrength";
 import PlayerProfile from "./PlayerProfile";
 import RecommendationCard from "./RecommendationCard";
 
@@ -17,7 +18,7 @@ const STORAGE_KEY = "nba-draft-manager-state-v2";
 
 export type DraftState = Record<string, { draftedBy: string; note: string }>;
 
-type Tab = "board" | "myteam";
+type Tab = "board" | "myteam" | "schedule";
 
 const DRAFT_DATE = new Date("2026-10-17T14:00:00+11:00");
 
@@ -229,6 +230,9 @@ export default function AppShell({
           <TabButton active={tab === "myteam"} onClick={() => setTab("myteam")}>
             My Team
           </TabButton>
+          <TabButton active={tab === "schedule"} onClick={() => setTab("schedule")}>
+            Schedule
+          </TabButton>
         </div>
 
         {tab === "board" ? (
@@ -236,7 +240,7 @@ export default function AppShell({
             <RecommendationCard
               recommendations={recommendations}
               onSelectPlayer={setProfilePlayer}
-              hasConsensusData={consensusPlayers.length > 0}
+              hasComparisonData={consensusPlayers.length > 0}
             />
             <DraftBoard
               myPlayers={myPlayers}
@@ -248,8 +252,10 @@ export default function AppShell({
               onSelectPlayer={setProfilePlayer}
             />
           </>
-        ) : (
+        ) : tab === "myteam" ? (
           <MyTeam players={myRosterPlayers} />
+        ) : (
+          <ScheduleStrength />
         )}
 
         {profilePlayer && (
