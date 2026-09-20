@@ -18,10 +18,12 @@ export default function RecommendationCard({
   recommendations,
   onSelectPlayer,
   hasComparisonData,
+  onDraftPlayer,
 }: {
   recommendations: Recommendation[];
   onSelectPlayer: (name: string) => void;
   hasComparisonData: boolean;
+  onDraftPlayer?: (name: string) => void;
 }) {
   if (recommendations.length === 0) {
     return (
@@ -72,19 +74,36 @@ export default function RecommendationCard({
           <span className={`text-xs font-medium border rounded-full px-2.5 py-1 ${CONFIDENCE_COLOR[best.confidence]}`}>
             Confidence: {best.confidence}
           </span>
+          {onDraftPlayer && (
+            <button
+              onClick={() => onDraftPlayer(best.player.name)}
+              className="text-sm font-medium bg-accent text-[#0A0E14] rounded-lg px-4 py-2 hover:brightness-110 transition-all"
+            >
+              Draft {best.player.name.split(" ").slice(-1)[0]}
+            </button>
+          )}
         </div>
       </div>
 
       {next.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border-subtle flex flex-wrap gap-x-6 gap-y-1.5">
+        <div className="mt-4 pt-4 border-t border-border-subtle flex flex-wrap gap-x-2 gap-y-2">
           {next.map((r) => (
-            <button
-              key={r.player.name}
-              onClick={() => onSelectPlayer(r.player.name)}
-              className="text-sm text-text-secondary hover:text-accent transition-colors"
-            >
-              Next: {r.player.name} — <span className="tabular font-medium">{r.draftScore.toFixed(1)}</span>
-            </button>
+            <div key={r.player.name} className="flex items-center gap-1.5 bg-surface-raised border border-border-subtle rounded-lg pl-3 pr-1.5 py-1">
+              <button
+                onClick={() => onSelectPlayer(r.player.name)}
+                className="text-sm text-text-secondary hover:text-accent transition-colors"
+              >
+                {r.player.name} <span className="tabular font-medium">{r.draftScore.toFixed(1)}</span>
+              </button>
+              {onDraftPlayer && (
+                <button
+                  onClick={() => onDraftPlayer(r.player.name)}
+                  className="text-xs bg-accent/90 text-[#0A0E14] rounded px-2 py-1 font-medium hover:bg-accent transition-colors"
+                >
+                  Draft
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

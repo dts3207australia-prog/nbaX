@@ -261,7 +261,7 @@ export default function AppShell({
         ) : tab === "schedule" ? (
           <ScheduleStrength />
         ) : (
-          <MockDraft myPlayers={myPlayers} consensusPlayers={consensusPlayers} onSelectPlayer={setProfilePlayer} />
+          <MockDraft myPlayers={myPlayers} consensusPlayers={consensusPlayers} fanscoutPlayers={fanscoutPlayers} onSelectPlayer={setProfilePlayer} />
         )}
 
         {profilePlayer && (

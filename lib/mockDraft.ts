@@ -41,6 +41,26 @@ export function teamRosterFromPicks(picks: MockPick[], teamIndex: number, myPlay
 
 // CPU teams draft using the same recommendation engine as the human user,
 // scored against their own roster needs so they don't stack five centers.
+export const CATEGORY_KEYS = [
+  "fg", "ft", "tpm", "tpPct", "oreb", "dreb", "ast", "ato", "stl", "blk", "pts",
+] as const;
+export type CategoryKey = (typeof CATEGORY_KEYS)[number];
+
+export function teamCategorySummary(
+  picks: MockPick[],
+  teamIndex: number,
+  myPlayers: ScoredPlayer[]
+): Record<CategoryKey, number> {
+  const sums = Object.fromEntries(CATEGORY_KEYS.map((k) => [k, 0])) as Record<CategoryKey, number>;
+  const names = picks.filter((p) => p.teamIndex === teamIndex).map((p) => p.playerName);
+  for (const name of names) {
+    const player = myPlayers.find((p) => normalizeName(p.name) === normalizeName(name));
+    if (!player) continue;
+    for (const k of CATEGORY_KEYS) sums[k] += player.categoryZ[k];
+  }
+  return sums;
+}
+
 export function simulateCpuPick(
   teamIndex: number,
   picks: MockPick[],
