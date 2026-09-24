@@ -51,8 +51,24 @@ export async function GET() {
   }
 
   if (!res.ok) {
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      try {
+        body = await res.text();
+      } catch {
+        body = null;
+      }
+    }
     return NextResponse.json(
-      { error: `ESPN returned ${res.status}. Cookies may be expired, or this filter format may need adjusting.` },
+      {
+        error: `ESPN returned ${res.status}. Cookies may be expired, or this filter format may need adjusting.`,
+        espnStatus: res.status,
+        espnResponseBody: body,
+        requestUrl: url,
+        requestFilter: filter,
+      },
       { status: res.status }
     );
   }
