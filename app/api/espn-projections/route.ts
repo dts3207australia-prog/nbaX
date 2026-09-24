@@ -26,14 +26,21 @@ export async function GET() {
   const url = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/fba/seasons/${SEASON_ID}/segments/0/leagues/${LEAGUE_ID}?view=kona_player_info`;
 
   // filterStatsForSourceIds: 1 = projected stats (0 = actual stats).
-  // limit is set high to try to capture the full rosterable player pool.
+  // filterStatsForTopScoringPeriodIds with "00{season}"/"10{season}" markers
+  // is the standard pattern for pulling full-season stat lines (rather than
+  // filterStatsForSeasonIds, which ESPN rejects unless paired with a single
+  // specific player ID — confirmed by testing against the live API).
+  const seasonYear = Number(SEASON_ID);
   const filter = {
     players: {
       filterStatus: { value: ["FREEAGENT", "WAIVERS", "ONTEAM"] },
       limit: 600,
       sortDraftRanks: { sortPriority: 100, sortAsc: true, value: "STANDARD" },
       filterStatsForSourceIds: { value: [1] },
-      filterStatsForSeasonIds: { value: [Number(SEASON_ID)] },
+      filterStatsForTopScoringPeriodIds: {
+        value: 82,
+        additionalValue: [`00${seasonYear}`, `10${seasonYear}`, `00${seasonYear - 1}`],
+      },
     },
   };
 
@@ -106,9 +113,15 @@ export async function GET() {
 
   const players = (rawPlayers as EspnPlayerEntry[]).map((entry) => {
     const player = entry.player ?? {};
-    const projectedEntry = (player.stats ?? []).find(
-      (s) => s.statSourceId === 1 && s.seasonId === Number(SEASON_ID)
-    );
+    // Match on statSourceId only (1 = projected) — don't also require an
+    // exact seasonId match, since the precise field format ESPN uses there
+    // isn't confirmed yet. If a player has multiple statSourceId===1
+    // entries, prefer the one with the highest appliedTotal (full-season
+    // projection is typically the largest such total).
+    const projectedEntries = (player.stats ?? []).filter((s) => s.statSourceId === 1);
+    const projectedEntry = projectedEntries.sort(
+      (a, b) => (b.appliedTotal ?? 0) - (a.appliedTotal ?? 0)
+    )[0];
     return {
       espnId: player.id,
       name: player.fullName,
@@ -117,6 +130,7 @@ export async function GET() {
       projectedStats: projectedEntry?.stats ?? null,
       appliedTotal: projectedEntry?.appliedTotal ?? null,
       appliedAverage: projectedEntry?.appliedAverage ?? null,
+      allStatsEntryCount: (player.stats ?? []).length,
     };
   });
 
