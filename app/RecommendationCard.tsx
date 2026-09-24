@@ -1,12 +1,6 @@
 "use client";
 
-import type { Recommendation, Confidence } from "@/lib/recommendation";
-
-const CONFIDENCE_COLOR: Record<Confidence, string> = {
-  HIGH: "text-status-positive border-status-positive/30 bg-[color:var(--status-positive-bg)]",
-  MEDIUM: "text-status-warning border-status-warning/30 bg-[color:var(--status-warning-bg)]",
-  LOW: "text-text-muted border-border-subtle bg-surface-raised",
-};
+import type { Recommendation } from "@/lib/recommendation";
 
 const ICON: Record<Recommendation["reasons"][number]["icon"], string> = {
   need: "🔴",
@@ -17,12 +11,10 @@ const ICON: Record<Recommendation["reasons"][number]["icon"], string> = {
 export default function RecommendationCard({
   recommendations,
   onSelectPlayer,
-  hasComparisonData,
   onDraftPlayer,
 }: {
   recommendations: Recommendation[];
   onSelectPlayer: (name: string) => void;
-  hasComparisonData: boolean;
   onDraftPlayer?: (name: string) => void;
 }) {
   if (recommendations.length === 0) {
@@ -71,9 +63,6 @@ export default function RecommendationCard({
             </div>
             <div className="text-xs text-text-muted">Draft Score</div>
           </div>
-          <span className={`text-xs font-medium border rounded-full px-2.5 py-1 ${CONFIDENCE_COLOR[best.confidence]}`}>
-            Confidence: {best.confidence}
-          </span>
           {onDraftPlayer && (
             <button
               onClick={() => onDraftPlayer(best.player.name)}
@@ -108,13 +97,9 @@ export default function RecommendationCard({
         </div>
       )}
 
-      {!hasComparisonData && (
-        <p className="text-xs text-text-muted mt-3">
-          Confidence ratings are limited without a second source to compare against.
-        </p>
-      )}
-      <p className="text-xs text-text-muted mt-1">
-        ADP isn&apos;t factored in yet — add ESPN/Yahoo ranking exports to sharpen this further.
+      <p className="text-xs text-text-muted mt-3">
+        Based on FanScout&apos;s 2026-27 projections. ADP isn&apos;t factored in yet — add ESPN/Yahoo
+        ranking exports to sharpen this further.
       </p>
     </div>
   );

@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ScoredPlayer } from "@/lib/scoring";
-import type { ConsensusPlayer } from "@/lib/consensus";
 import type { FanscoutPlayer } from "@/lib/fanscout";
 import { normalizeName } from "@/lib/names";
 import { NUM_TEAMS } from "@/lib/roster";
@@ -15,7 +13,7 @@ import MockDraft from "./MockDraft";
 import PlayerProfile from "./PlayerProfile";
 import RecommendationCard from "./RecommendationCard";
 
-const STORAGE_KEY = "nba-draft-manager-state-v2";
+const STORAGE_KEY = "nba-draft-manager-state-v3";
 
 export type DraftState = Record<string, { draftedBy: string; note: string }>;
 
@@ -23,15 +21,7 @@ type Tab = "board" | "myteam" | "schedule" | "mockdraft";
 
 const DRAFT_DATE = new Date("2026-10-17T14:00:00+11:00");
 
-export default function AppShell({
-  myPlayers,
-  consensusPlayers,
-  fanscoutPlayers,
-}: {
-  myPlayers: ScoredPlayer[];
-  consensusPlayers: ConsensusPlayer[];
-  fanscoutPlayers: FanscoutPlayer[];
-}) {
+export default function AppShell({ players }: { players: FanscoutPlayer[] }) {
   const [tab, setTab] = useState<Tab>("board");
   const [draftState, setDraftState] = useState<DraftState>({});
   const [teams, setTeams] = useState<string[]>(defaultTeams(NUM_TEAMS));
@@ -71,29 +61,18 @@ export default function AppShell({
   const myRosterPlayers = Object.entries(draftState)
     .filter(([, v]) => v.draftedBy === myTeamName)
     .map(([key]) => {
-      const mine = myPlayers.find((p) => normalizeName(p.name) === key);
-      const consensus = consensusPlayers.find((p) => normalizeName(p.name) === key);
-      const source = mine ?? consensus;
-      if (!source) return null;
-      return {
-        name: source.name,
-        pos: source.pos,
-        score: mine ? mine.total : consensus ? consensus.total : 0,
-      };
+      const player = players.find((p) => normalizeName(p.name) === key);
+      if (!player) return null;
+      return { name: player.name, pos: player.pos, score: player.total };
     })
     .filter((p): p is { name: string; pos: string; score: number } => p !== null);
 
-  const availableMyPlayers = myPlayers.filter(
-    (p) => !draftState[normalizeName(p.name)]?.draftedBy
-  );
-  const availableConsensus = consensusPlayers.filter(
+  const availablePlayers = players.filter(
     (p) => !draftState[normalizeName(p.name)]?.draftedBy
   );
   const recommendations = computeRecommendations({
-    availableMyPlayers,
-    availableConsensus,
-    allMyPlayers: myPlayers,
-    allConsensus: consensusPlayers,
+    availablePlayers,
+    allPlayers: players,
     myRosterPlayers,
   });
 
@@ -126,9 +105,7 @@ export default function AppShell({
         for (const t of ordered) {
           for (const playerName of t.players) {
             const key = normalizeName(playerName);
-            const inPool =
-              myPlayers.some((p) => normalizeName(p.name) === key) ||
-              consensusPlayers.some((p) => normalizeName(p.name) === key);
+            const inPool = players.some((p) => normalizeName(p.name) === key);
             if (!inPool) { unmatched++; continue; }
             matched++;
             next[key] = { draftedBy: t.name, note: next[key]?.note ?? "" };
@@ -180,7 +157,7 @@ export default function AppShell({
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6">
         {/* Stat strip */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <StatCard label="Players drafted" value={`${draftedCount} / ${myPlayers.length}`} />
+          <StatCard label="Players drafted" value={`${draftedCount} / ${players.length}`} />
           <StatCard label="Your team" value={myTeamName} accent />
           <StatCard label="Draft date" value="Oct 17, 2026" sub={daysUntilDraft > 0 ? `${daysUntilDraft} days away` : "Today"} />
           <StatCard label="Teams" value={String(teams.length)} />
@@ -244,12 +221,9 @@ export default function AppShell({
             <RecommendationCard
               recommendations={recommendations}
               onSelectPlayer={setProfilePlayer}
-              hasComparisonData={consensusPlayers.length > 0}
             />
             <DraftBoard
-              myPlayers={myPlayers}
-              consensusPlayers={consensusPlayers}
-              fanscoutPlayers={fanscoutPlayers}
+              players={players}
               teams={teams}
               draftState={draftState}
               setDraftState={setDraftState}
@@ -261,15 +235,13 @@ export default function AppShell({
         ) : tab === "schedule" ? (
           <ScheduleStrength />
         ) : (
-          <MockDraft myPlayers={myPlayers} consensusPlayers={consensusPlayers} fanscoutPlayers={fanscoutPlayers} onSelectPlayer={setProfilePlayer} />
+          <MockDraft players={players} onSelectPlayer={setProfilePlayer} />
         )}
 
         {profilePlayer && (
           <PlayerProfile
             name={profilePlayer}
-            myPlayers={myPlayers}
-            consensusPlayers={consensusPlayers}
-            fanscoutPlayers={fanscoutPlayers}
+            players={players}
             onClose={() => setProfilePlayer(null)}
           />
         )}

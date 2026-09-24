@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ScoredPlayer } from "@/lib/scoring";
-import type { ConsensusPlayer } from "@/lib/consensus";
 import type { FanscoutPlayer } from "@/lib/fanscout";
 import { normalizeName } from "@/lib/names";
 import {
@@ -13,24 +11,20 @@ import {
 import { computeRecommendations } from "@/lib/recommendation";
 import RecommendationCard from "./RecommendationCard";
 
-const STORAGE_KEY = "nba-draft-manager-mock-v1";
+const STORAGE_KEY = "nba-draft-manager-mock-v2";
 const TOTAL_PICKS = MOCK_NUM_TEAMS * MOCK_ROUNDS;
 const CATEGORY_LABEL: Record<string, string> = {
-  fg: "FG%", ft: "FT%", tpm: "3PM", tpPct: "3P%", oreb: "OREB", dreb: "DREB",
-  ast: "AST", ato: "A/TO", stl: "STL", blk: "BLK", pts: "PTS",
+  zFgPct: "FG%", zFtPct: "FT%", zTpm: "3PM", zOreb: "OREB", zDreb: "DREB",
+  zAst: "AST", zAto: "A/TO", zStl: "STL", zBlk: "BLK", zPts: "PTS",
 };
 
 type MockState = { picks: MockPick[]; userTeamIndex: number | null };
 
 export default function MockDraft({
-  myPlayers,
-  consensusPlayers,
-  fanscoutPlayers,
+  players,
   onSelectPlayer,
 }: {
-  myPlayers: ScoredPlayer[];
-  consensusPlayers: ConsensusPlayer[];
-  fanscoutPlayers: FanscoutPlayer[];
+  players: FanscoutPlayer[];
   onSelectPlayer: (name: string) => void;
 }) {
   const [state, setState] = useState<MockState>({ picks: [], userTeamIndex: null });
@@ -52,7 +46,7 @@ export default function MockDraft({
 
   const { picks, userTeamIndex } = state;
   const draftedKeys = useMemo(() => new Set(picks.map((p) => normalizeName(p.playerName))), [picks]);
-  const available = useMemo(() => myPlayers.filter((p) => !draftedKeys.has(normalizeName(p.name))), [myPlayers, draftedKeys]);
+  const available = useMemo(() => players.filter((p) => !draftedKeys.has(normalizeName(p.name))), [players, draftedKeys]);
 
   const nextOverall = picks.length + 1;
   const draftComplete = picks.length >= TOTAL_PICKS;
@@ -63,7 +57,7 @@ export default function MockDraft({
     if (userTeamIndex === null || draftComplete || !current) return;
     if (current.teamIndex === userTeamIndex) return;
     const timer = setTimeout(() => {
-      const playerName = simulateCpuPick(current.teamIndex, picks, myPlayers, consensusPlayers);
+      const playerName = simulateCpuPick(current.teamIndex, picks, players);
       if (!playerName) return;
       setState((prev) => ({
         ...prev,
@@ -71,21 +65,18 @@ export default function MockDraft({
       }));
     }, 180);
     return () => clearTimeout(timer);
-  }, [picks, userTeamIndex, draftComplete, current, nextOverall, myPlayers, consensusPlayers]);
+  }, [picks, userTeamIndex, draftComplete, current, nextOverall, players]);
 
-  const userRoster = userTeamIndex !== null ? teamRosterFromPicks(picks, userTeamIndex, myPlayers) : [];
+  const userRoster = userTeamIndex !== null ? teamRosterFromPicks(picks, userTeamIndex, players) : [];
 
   const recommendations = useMemo(() => {
     if (!isUserTurn) return [];
-    const availableConsensus = consensusPlayers.filter((p) => !draftedKeys.has(normalizeName(p.name)));
     return computeRecommendations({
-      availableMyPlayers: available,
-      availableConsensus,
-      allMyPlayers: myPlayers,
-      allConsensus: consensusPlayers,
+      availablePlayers: available,
+      allPlayers: players,
       myRosterPlayers: userRoster,
     });
-  }, [isUserTurn, available, myPlayers, userRoster, consensusPlayers, draftedKeys]);
+  }, [isUserTurn, available, players, userRoster]);
 
   const draftPlayer = (name: string) => {
     if (!current) return;
@@ -136,8 +127,8 @@ export default function MockDraft({
   }
 
   const selectedTeam = viewTeam ?? userTeamIndex;
-  const selectedRoster = teamRosterFromPicks(picks, selectedTeam, myPlayers);
-  const categorySummary = teamCategorySummary(picks, selectedTeam, myPlayers);
+  const selectedRoster = teamRosterFromPicks(picks, selectedTeam, players);
+  const categorySummary = teamCategorySummary(picks, selectedTeam, players);
   const maxAbsCat = Math.max(1, ...CATEGORY_KEYS.map((k) => Math.abs(categorySummary[k])));
 
   return (
@@ -163,7 +154,6 @@ export default function MockDraft({
           <RecommendationCard
             recommendations={recommendations}
             onSelectPlayer={onSelectPlayer}
-            hasComparisonData={consensusPlayers.length > 0}
             onDraftPlayer={draftPlayer}
           />
           <div className="mb-2">
@@ -199,7 +189,6 @@ export default function MockDraft({
         </>
       )}
 
-      {/* Team roster + multi-source ratings + category strength */}
       <div className="mb-6">
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
           <h3 className="font-display text-sm text-text-secondary tracking-wide">Team roster</h3>
@@ -227,20 +216,17 @@ export default function MockDraft({
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Player</th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Pos</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">My Rank</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Consensus</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">FanScout</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Rank</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">Value</th>
                 </tr>
               </thead>
               <tbody>
                 {selectedRoster.length === 0 && (
-                  <tr><td colSpan={5} className="px-3 py-4 text-sm text-text-muted italic">No picks yet</td></tr>
+                  <tr><td colSpan={4} className="px-3 py-4 text-sm text-text-muted italic">No picks yet</td></tr>
                 )}
                 {selectedRoster.map((rp) => {
                   const key = normalizeName(rp.name);
-                  const mine = myPlayers.find((p) => normalizeName(p.name) === key);
-                  const cons = consensusPlayers.find((p) => normalizeName(p.name) === key);
-                  const fs = fanscoutPlayers.find((p) => normalizeName(p.name) === key);
+                  const player = players.find((p) => normalizeName(p.name) === key);
                   return (
                     <tr key={rp.name} className="border-t border-border-subtle">
                       <td className="px-3 py-2">
@@ -250,13 +236,10 @@ export default function MockDraft({
                       </td>
                       <td className="px-3 py-2 text-text-muted text-xs">{rp.pos}</td>
                       <td className="px-3 py-2 tabular text-text-secondary text-xs">
-                        {mine ? `#${mine.rank}` : "—"}
+                        {player ? `#${player.rank}` : "—"}
                       </td>
-                      <td className="px-3 py-2 tabular text-text-secondary text-xs">
-                        {cons ? `#${cons.rank}` : "—"}
-                      </td>
-                      <td className="px-3 py-2 tabular text-text-secondary text-xs">
-                        {fs ? `#${fs.rank}` : "—"}
+                      <td className="px-3 py-2 tabular text-accent text-xs font-medium">
+                        {player ? player.total.toFixed(2) : "—"}
                       </td>
                     </tr>
                   );
@@ -294,7 +277,7 @@ export default function MockDraft({
               })}
             </div>
             <p className="text-xs text-text-muted mt-3">
-              Sum of each player&apos;s category z-score (My Rankings engine). 3P% is always 0 — not
+              Sum of each player&apos;s FanScout category z-score. 3P% isn&apos;t shown — not
               available from the underlying projection source.
             </p>
           </div>
