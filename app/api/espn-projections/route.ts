@@ -107,43 +107,51 @@ export async function GET() {
       fullName?: string;
       proTeamId?: number;
       defaultPositionId?: number;
-      stats?: { statSourceId?: number; seasonId?: number; stats?: Record<string, number>; appliedTotal?: number; appliedAverage?: number }[];
+      stats?: { statSourceId?: number; stats?: Record<string, number>; appliedTotal?: number }[];
     };
   };
 
   const players = (rawPlayers as EspnPlayerEntry[]).map((entry) => {
     const player = entry.player ?? {};
-    // Match on statSourceId only (1 = projected) — don't also require an
-    // exact seasonId match, since the precise field format ESPN uses there
-    // isn't confirmed yet. If a player has multiple statSourceId===1
-    // entries, prefer the one with the highest appliedTotal (full-season
-    // projection is typically the largest such total).
     const projectedEntries = (player.stats ?? []).filter((s) => s.statSourceId === 1);
     const projectedEntry = projectedEntries.sort(
       (a, b) => (b.appliedTotal ?? 0) - (a.appliedTotal ?? 0)
     )[0];
+    const s = projectedEntry?.stats;
+
+    // Verified stat-ID mapping (cross-checked against Jokić's real numbers:
+    // e.g. 0/42 = 29 confirms 0=PTS total, 29=PTS/gm, 42=games played).
+    const games = s?.["42"] ?? null;
+    const fgm = s?.["13"] ?? null, fga = s?.["14"] ?? null;
+    const ftm = s?.["15"] ?? null, fta = s?.["16"] ?? null;
+    const tpm = s?.["17"] ?? null, tpa = s?.["18"] ?? null;
+
     return {
       espnId: player.id,
       name: player.fullName,
       proTeamId: player.proTeamId,
       defaultPositionId: player.defaultPositionId,
-      projectedStats: projectedEntry?.stats ?? null,
-      appliedTotal: projectedEntry?.appliedTotal ?? null,
-      appliedAverage: projectedEntry?.appliedAverage ?? null,
-      allStatsEntryCount: (player.stats ?? []).length,
+      gamesPlayed: games,
+      minutesPerGame: s?.["28"] ?? null,
+      ptsPerGame: s?.["29"] ?? null,
+      rebPerGame: s?.["30"] ?? null,
+      astPerGame: s?.["26"] ?? null,
+      stlPerGame: s?.["31"] ?? null,
+      blkPerGame: s?.["27"] ?? null,
+      toPerGame: s?.["32"] ?? null,
+      fgm, fga, fgPct: fgm !== null && fga ? fgm / fga : null,
+      ftm, fta, ftPct: ftm !== null && fta ? ftm / fta : null,
+      tpm, tpa, tpPct: tpm !== null && tpa ? tpm / tpa : null,
+      hasProjection: !!s,
     };
   });
 
-  const matchedProjections = players.filter((p) => p.projectedStats !== null).length;
+  const matchedProjections = players.filter((p) => p.hasProjection).length;
 
   return NextResponse.json({
     count: players.length,
     matchedProjections,
     players,
     fetchedAt: new Date().toISOString(),
-    // Include one full raw entry so the stat-ID-to-category mapping can be
-    // verified/fixed against real data if projectedStats objects came back
-    // with unfamiliar numeric keys.
-    rawSampleEntry: rawPlayers[0] ?? null,
   });
 }
