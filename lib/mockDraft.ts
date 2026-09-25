@@ -15,7 +15,7 @@ export type MockPick = {
 };
 
 export const CATEGORY_KEYS = [
-  "zFgPct", "zFtPct", "zTpm", "zOreb", "zDreb", "zAst", "zAto", "zStl", "zBlk", "zPts",
+  "zFgPct", "zFtPct", "zTpm", "zTpPct", "zOreb", "zDreb", "zAst", "zAto", "zStl", "zBlk", "zPts",
 ] as const;
 export type CategoryKey = (typeof CATEGORY_KEYS)[number];
 

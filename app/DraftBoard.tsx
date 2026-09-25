@@ -2,39 +2,53 @@
 
 import { useMemo, useState } from "react";
 import type { FanscoutPlayer } from "@/lib/fanscout";
+import type { EspnPlayer } from "@/lib/espn";
 import { normalizeName } from "@/lib/names";
 import type { DraftState } from "./AppShell";
 
-type SortKey =
+type Source = "fanscout" | "espn";
+
+type FanscoutSortKey =
   | "rank" | "name" | "pos" | "total" | "pts" | "tpm" | "oreb" | "dreb" | "ast"
-  | "ato" | "stl" | "blk" | "fgPct" | "ftPct";
+  | "ato" | "stl" | "blk" | "fgPct" | "ftPct" | "tpPct";
+
+type EspnSortKey =
+  | "name" | "pos" | "pts" | "reb" | "ast" | "stl" | "blk" | "tov"
+  | "tpm" | "tpPct" | "fgPct" | "ftPct";
 
 export default function DraftBoard({
   players,
+  espnPlayers,
   teams,
   draftState,
   setDraftState,
   onSelectPlayer,
 }: {
   players: FanscoutPlayer[];
+  espnPlayers: EspnPlayer[];
   teams: string[];
   draftState: DraftState;
   setDraftState: (updater: (prev: DraftState) => DraftState) => void;
   onSelectPlayer: (name: string) => void;
 }) {
-  const [sortKey, setSortKey] = useState<SortKey>("rank");
-  const [sortAsc, setSortAsc] = useState(true);
+  const [source, setSource] = useState<Source>("fanscout");
+  const [fsSortKey, setFsSortKey] = useState<FanscoutSortKey>("rank");
+  const [fsSortAsc, setFsSortAsc] = useState(true);
+  const [espnSortKey, setEspnSortKey] = useState<EspnSortKey>("pts");
+  const [espnSortAsc, setEspnSortAsc] = useState(false);
   const [search, setSearch] = useState("");
   const [posFilter, setPosFilter] = useState("ALL");
   const [hideDrafted, setHideDrafted] = useState(false);
 
+  const activeList: (FanscoutPlayer | EspnPlayer)[] = source === "fanscout" ? players : espnPlayers;
+
   const positions = useMemo(() => {
-    const set = new Set(players.map((p) => p.pos));
+    const set = new Set(activeList.map((p) => p.pos));
     return ["ALL", ...Array.from(set).sort()];
-  }, [players]);
+  }, [activeList]);
 
   const filtered = useMemo(() => {
-    let list = players.filter((p) =>
+    let list = activeList.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
     if (posFilter !== "ALL") list = list.filter((p) => p.pos === posFilter);
@@ -42,10 +56,14 @@ export default function DraftBoard({
       list = list.filter((p) => !draftState[normalizeName(p.name)]?.draftedBy);
     }
     return list;
-  }, [players, search, posFilter, hideDrafted, draftState]);
+  }, [activeList, search, posFilter, hideDrafted, draftState]);
+
+  const sortKey = source === "fanscout" ? fsSortKey : espnSortKey;
+  const sortAsc = source === "fanscout" ? fsSortAsc : espnSortAsc;
 
   const sorted = useMemo(() => {
-    const getValue = (p: FanscoutPlayer): number | string => {
+    const getValue = (p: FanscoutPlayer | EspnPlayer): number | string => {
+      // @ts-expect-error - key set matches the active source's shape
       return p[sortKey];
     };
     const arr = [...filtered];
@@ -60,12 +78,15 @@ export default function DraftBoard({
     return arr;
   }, [filtered, sortKey, sortAsc]);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortAsc(!sortAsc);
+  const toggleSort = (key: FanscoutSortKey | EspnSortKey) => {
+    if (source === "fanscout") {
+      const k = key as FanscoutSortKey;
+      if (fsSortKey === k) setFsSortAsc(!fsSortAsc);
+      else { setFsSortKey(k); setFsSortAsc(k === "rank" || k === "name" || k === "pos"); }
     } else {
-      setSortKey(key);
-      setSortAsc(key === "rank" || key === "name" || key === "pos");
+      const k = key as EspnSortKey;
+      if (espnSortKey === k) setEspnSortAsc(!espnSortAsc);
+      else { setEspnSortKey(k); setEspnSortAsc(k === "name" || k === "pos"); }
     }
   };
 
@@ -91,7 +112,7 @@ export default function DraftBoard({
 
   const draftedCount = Object.values(draftState).filter((v) => v.draftedBy).length;
 
-  const headerCell = (label: string, key: SortKey) => (
+  const headerCell = (label: string, key: FanscoutSortKey | EspnSortKey) => (
     <th
       onClick={() => toggleSort(key)}
       className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer select-none whitespace-nowrap hover:text-text-secondary transition-colors"
@@ -102,9 +123,24 @@ export default function DraftBoard({
 
   return (
     <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="inline-flex rounded-lg border border-border-subtle bg-surface p-1">
+          <SourceButton active={source === "fanscout"} onClick={() => setSource("fanscout")}>
+            Draft Engine (FanScout + ESPN 3P%)
+          </SourceButton>
+          <SourceButton active={source === "espn"} onClick={() => setSource("espn")}>
+            ESPN Projections
+          </SourceButton>
+        </div>
+        <p className="text-text-muted text-xs tabular">
+          {draftedCount} of {players.length} drafted
+        </p>
+      </div>
+
       <p className="text-text-secondary text-sm mb-4">
-        FanScout&apos;s real 2026-27 per-game projections, with their own pre-computed Value score.{" "}
-        <span className="text-text-muted tabular">{draftedCount} of {players.length} drafted.</span>
+        {source === "fanscout"
+          ? "FanScout's real 2026-27 per-game projections and Value score, with real 3P% merged in from ESPN's live projections — all 11 of your league's categories are now covered."
+          : "ESPN's own 2026-27 season-long fantasy projections, pulled live from their private Fantasy API. Shown as-is for reference and cross-checking."}
       </p>
 
       <div className="flex flex-wrap gap-3 mb-4 items-center">
@@ -138,20 +174,40 @@ export default function DraftBoard({
           <table className="min-w-full text-sm">
             <thead className="bg-surface-raised text-text-muted border-b border-border-subtle sticky top-0">
               <tr>
-                {headerCell("Rank", "rank")}
-                {headerCell("Player", "name")}
-                {headerCell("Pos", "pos")}
-                {headerCell("Value", "total")}
-                {headerCell("PTS", "pts")}
-                {headerCell("3PM", "tpm")}
-                {headerCell("OREB", "oreb")}
-                {headerCell("DREB", "dreb")}
-                {headerCell("AST", "ast")}
-                {headerCell("A/TO", "ato")}
-                {headerCell("STL", "stl")}
-                {headerCell("BLK", "blk")}
-                {headerCell("FG%", "fgPct")}
-                {headerCell("FT%", "ftPct")}
+                {source === "fanscout" ? (
+                  <>
+                    {headerCell("Rank", "rank")}
+                    {headerCell("Player", "name")}
+                    {headerCell("Pos", "pos")}
+                    {headerCell("Value", "total")}
+                    {headerCell("PTS", "pts")}
+                    {headerCell("3PM", "tpm")}
+                    {headerCell("3P%", "tpPct")}
+                    {headerCell("OREB", "oreb")}
+                    {headerCell("DREB", "dreb")}
+                    {headerCell("AST", "ast")}
+                    {headerCell("A/TO", "ato")}
+                    {headerCell("STL", "stl")}
+                    {headerCell("BLK", "blk")}
+                    {headerCell("FG%", "fgPct")}
+                    {headerCell("FT%", "ftPct")}
+                  </>
+                ) : (
+                  <>
+                    {headerCell("Player", "name")}
+                    {headerCell("Pos", "pos")}
+                    {headerCell("PTS", "pts")}
+                    {headerCell("REB", "reb")}
+                    {headerCell("AST", "ast")}
+                    {headerCell("STL", "stl")}
+                    {headerCell("BLK", "blk")}
+                    {headerCell("TOV", "tov")}
+                    {headerCell("3PM", "tpm")}
+                    {headerCell("3P%", "tpPct")}
+                    {headerCell("FG%", "fgPct")}
+                    {headerCell("FT%", "ftPct")}
+                  </>
+                )}
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Drafted By</th>
                 <th className="px-3 py-2.5 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Notes</th>
               </tr>
@@ -160,6 +216,8 @@ export default function DraftBoard({
               {sorted.map((p, idx) => {
                 const key = normalizeName(p.name);
                 const isDrafted = !!draftState[key]?.draftedBy;
+                const fp = p as FanscoutPlayer;
+                const ep = p as EspnPlayer;
                 return (
                   <tr
                     key={p.name}
@@ -167,24 +225,50 @@ export default function DraftBoard({
                       isDrafted ? "opacity-40" : idx % 2 === 0 ? "bg-surface" : "bg-surface-raised/40"
                     } hover:bg-surface-raised`}
                   >
-                    <td className="px-3 py-2 tabular text-text-muted">{p.rank}</td>
-                    <td className="px-3 py-2 font-medium whitespace-nowrap">
-                      <button onClick={() => onSelectPlayer(p.name)} className="text-text-primary hover:text-accent transition-colors text-left">
-                        {p.name}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2 text-text-muted text-xs">{p.pos}</td>
-                    <td className="px-3 py-2 tabular font-medium text-accent">{p.total.toFixed(2)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.pts.toFixed(1)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.tpm.toFixed(1)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.oreb.toFixed(1)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.dreb.toFixed(1)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.ast.toFixed(1)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.ato.toFixed(2)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.stl.toFixed(1)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{p.blk.toFixed(1)}</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{(p.fgPct * 100).toFixed(1)}%</td>
-                    <td className="px-3 py-2 tabular text-text-secondary">{(p.ftPct * 100).toFixed(1)}%</td>
+                    {source === "fanscout" ? (
+                      <>
+                        <td className="px-3 py-2 tabular text-text-muted">{fp.rank}</td>
+                        <td className="px-3 py-2 font-medium whitespace-nowrap">
+                          <button onClick={() => onSelectPlayer(p.name)} className="text-text-primary hover:text-accent transition-colors text-left">
+                            {p.name}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-text-muted text-xs">{p.pos}</td>
+                        <td className="px-3 py-2 tabular font-medium text-accent">{fp.total.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.pts.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.tpm.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">
+                          {fp.tpDataAvailable ? `${(fp.tpPct! * 100).toFixed(1)}%` : "—"}
+                        </td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.oreb.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.dreb.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.ast.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.ato.toFixed(2)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.stl.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{fp.blk.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(fp.fgPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(fp.ftPct * 100).toFixed(1)}%</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-2 font-medium whitespace-nowrap">
+                          <button onClick={() => onSelectPlayer(p.name)} className="text-text-primary hover:text-accent transition-colors text-left">
+                            {p.name}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-text-muted text-xs">{ep.pos} · {ep.team}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{ep.pts.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{ep.reb.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{ep.ast.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{ep.stl.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{ep.blk.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{ep.tov.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{ep.tpm.toFixed(1)}</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(ep.tpPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(ep.fgPct * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-2 tabular text-text-secondary">{(ep.ftPct * 100).toFixed(1)}%</td>
+                      </>
+                    )}
                     <td className="px-3 py-2">
                       <select
                         value={draftState[key]?.draftedBy ?? ""}
@@ -218,8 +302,29 @@ export default function DraftBoard({
 
       <p className="text-xs text-text-muted mt-3">
         Click a player&apos;s name for their full profile. Drafted-by tags, notes, and team names
-        are saved locally in your browser only.
+        are saved locally in your browser and shared between both tables (matched by player name).
       </p>
     </div>
+  );
+}
+
+function SourceButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+        active ? "bg-accent text-[#0A0E14]" : "text-text-secondary hover:text-text-primary"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

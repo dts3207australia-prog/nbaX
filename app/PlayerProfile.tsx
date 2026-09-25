@@ -1,6 +1,7 @@
 "use client";
 
 import type { FanscoutPlayer } from "@/lib/fanscout";
+import type { EspnPlayer } from "@/lib/espn";
 import { normalizeName } from "@/lib/names";
 import { getScheduleStrength } from "@/lib/schedule";
 import { TEAM_ABBR_TO_NAME } from "@/lib/teams.reference";
@@ -8,14 +9,17 @@ import { TEAM_ABBR_TO_NAME } from "@/lib/teams.reference";
 export default function PlayerProfile({
   name,
   players,
+  espnPlayers,
   onClose,
 }: {
   name: string;
   players: FanscoutPlayer[];
+  espnPlayers: EspnPlayer[];
   onClose: () => void;
 }) {
   const key = normalizeName(name);
   const player = players.find((p) => normalizeName(p.name) === key);
+  const espn = espnPlayers.find((p) => normalizeName(p.name) === key);
 
   const teamFullName = player ? TEAM_ABBR_TO_NAME[player.team] : undefined;
   const teamSos = teamFullName
@@ -68,12 +72,20 @@ export default function PlayerProfile({
         <div className="p-5 space-y-5">
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-surface-raised border border-border-subtle rounded-xl p-3">
-              <div className="text-xs text-text-muted">FanScout rank</div>
+              <div className="text-xs text-text-muted">Rank</div>
               <div className="font-display text-xl font-medium text-text-primary mt-0.5 tabular">#{player.rank}</div>
+              {player.baseRank !== player.rank && (
+                <div className="text-xs text-text-muted mt-0.5">FanScout alone: #{player.baseRank}</div>
+              )}
             </div>
             <div className="bg-surface-raised border border-border-subtle rounded-xl p-3">
               <div className="text-xs text-text-muted">Value score</div>
               <div className="font-display text-xl font-medium text-accent mt-0.5 tabular">{player.total.toFixed(2)}</div>
+              {player.tpDataAvailable && (
+                <div className="text-xs text-status-positive mt-0.5">
+                  {player.zTpPct >= 0 ? "+" : ""}{player.zTpPct.toFixed(2)} from 3P%
+                </div>
+              )}
             </div>
             <div className="bg-surface-raised border border-border-subtle rounded-xl p-3">
               <div className="text-xs text-text-muted">Games / Minutes</div>
@@ -97,6 +109,7 @@ export default function PlayerProfile({
                 <tbody>
                   {row("PTS", player.pts.toFixed(1), player.zPts.toFixed(2))}
                   {row("3PM", player.tpm.toFixed(1), player.zTpm.toFixed(2))}
+                  {row("3P%", player.tpDataAvailable ? `${(player.tpPct! * 100).toFixed(1)}% (${player.tpa!.toFixed(1)} 3PA/gm, via ESPN)` : undefined, player.tpDataAvailable ? player.zTpPct.toFixed(2) : undefined)}
                   {row("OREB", player.oreb.toFixed(1), player.zOreb.toFixed(2))}
                   {row("DREB", player.dreb.toFixed(1), player.zDreb.toFixed(2))}
                   {row("AST", player.ast.toFixed(1), player.zAst.toFixed(2))}
@@ -109,10 +122,44 @@ export default function PlayerProfile({
               </table>
             </div>
             <p className="text-xs text-text-muted mt-2">
-              3P% isn&apos;t available from this source (no 3-point-attempts data) — 10 of your league&apos;s
-              11 categories are covered here.
+              {player.tpDataAvailable
+                ? "All 11 of your league's categories are covered — 3P% is merged in from ESPN's live projections."
+                : "3P% not available for this player from ESPN's projections — contributes 0 rather than penalizing them."}
             </p>
           </div>
+
+          {espn && (
+            <div>
+              <h3 className="font-display text-sm text-text-secondary mb-2 tracking-wide">ESPN&apos;s own projection (independent source)</h3>
+              <div className="rounded-xl border border-border-subtle overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-raised">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">PTS</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">REB</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">AST</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">STL</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">BLK</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider">3P%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-border-subtle">
+                      <td className="px-3 py-2 tabular text-text-primary">{espn.pts.toFixed(1)}</td>
+                      <td className="px-3 py-2 tabular text-text-primary">{espn.reb.toFixed(1)}</td>
+                      <td className="px-3 py-2 tabular text-text-primary">{espn.ast.toFixed(1)}</td>
+                      <td className="px-3 py-2 tabular text-text-primary">{espn.stl.toFixed(1)}</td>
+                      <td className="px-3 py-2 tabular text-text-primary">{espn.blk.toFixed(1)}</td>
+                      <td className="px-3 py-2 tabular text-text-primary">{(espn.tpPct * 100).toFixed(1)}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-text-muted mt-2">
+                {espn.gamesPlayed} games projected, {espn.minutes.toFixed(1)} min/game — {espn.team}.
+              </p>
+            </div>
+          )}
 
           {teamSos && (
             <p className="text-xs text-text-muted">

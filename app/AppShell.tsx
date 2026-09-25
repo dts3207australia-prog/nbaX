@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FanscoutPlayer } from "@/lib/fanscout";
+import type { EspnPlayer } from "@/lib/espn";
 import { normalizeName } from "@/lib/names";
 import { NUM_TEAMS } from "@/lib/roster";
 import { defaultTeams, TEAMS_STORAGE_KEY } from "@/lib/teams";
@@ -21,7 +22,7 @@ type Tab = "board" | "myteam" | "schedule" | "mockdraft";
 
 const DRAFT_DATE = new Date("2026-10-17T14:00:00+11:00");
 
-export default function AppShell({ players }: { players: FanscoutPlayer[] }) {
+export default function AppShell({ players, espnPlayers }: { players: FanscoutPlayer[]; espnPlayers: EspnPlayer[] }) {
   const [tab, setTab] = useState<Tab>("board");
   const [draftState, setDraftState] = useState<DraftState>({});
   const [teams, setTeams] = useState<string[]>(defaultTeams(NUM_TEAMS));
@@ -224,6 +225,7 @@ export default function AppShell({ players }: { players: FanscoutPlayer[] }) {
             />
             <DraftBoard
               players={players}
+              espnPlayers={espnPlayers}
               teams={teams}
               draftState={draftState}
               setDraftState={setDraftState}
@@ -242,6 +244,7 @@ export default function AppShell({ players }: { players: FanscoutPlayer[] }) {
           <PlayerProfile
             name={profilePlayer}
             players={players}
+            espnPlayers={espnPlayers}
             onClose={() => setProfilePlayer(null)}
           />
         )}

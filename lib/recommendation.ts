@@ -15,7 +15,7 @@ const SLOT_LABEL: Record<SlotType, string> = {
 
 const CATEGORY_LABEL: Record<string, string> = {
   zPts: "PTS", zTpm: "3PM", zAst: "AST", zOreb: "OREB", zDreb: "DREB",
-  zStl: "STL", zBlk: "BLK", zAto: "A/TO", zFgPct: "FG%", zFtPct: "FT%",
+  zStl: "STL", zBlk: "BLK", zAto: "A/TO", zFgPct: "FG%", zFtPct: "FT%", zTpPct: "3P%",
 };
 
 function totalStarterSlotsOfType(slot: SlotType): number {
@@ -88,6 +88,7 @@ export function computeRecommendations({
       ["zPts", player.zPts], ["zTpm", player.zTpm], ["zAst", player.zAst],
       ["zOreb", player.zOreb], ["zDreb", player.zDreb], ["zStl", player.zStl],
       ["zBlk", player.zBlk], ["zAto", player.zAto], ["zFgPct", player.zFgPct], ["zFtPct", player.zFtPct],
+      ...(player.tpDataAvailable ? [["zTpPct", player.zTpPct] as [string, number]] : []),
     ];
     const topCats = catEntries
       .filter(([, z]) => z > 0.75)
