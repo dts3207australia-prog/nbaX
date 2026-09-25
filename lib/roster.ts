@@ -1,5 +1,6 @@
-// Matches the "Dunk it Dunk it!" league settings: 8 teams, 14-man rosters,
-// 10 starters (1 C, 3 G, 2 F, 1 F/C, 3 UTIL) + 4 bench (incl. 1 IR).
+// Matches the "Dunk it Dunk it!" league's actual in-app roster (confirmed
+// against the live empty-roster screen): 8 teams, 15-man rosters,
+// 10 starters (1 C, 3 G, 2 F, 1 F/C, 3 UTIL) + 5 bench (4 BE + 1 IR).
 
 export type SlotType = "C" | "G" | "F" | "F/C" | "UTIL" | "BE" | "IR";
 
@@ -9,7 +10,7 @@ export const ROSTER_SLOTS: SlotType[] = [
   "F", "F",
   "F/C",
   "UTIL", "UTIL", "UTIL",
-  "BE", "BE", "BE",
+  "BE", "BE", "BE", "BE",
   "IR",
 ];
 
